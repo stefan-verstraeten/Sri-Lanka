@@ -46,3 +46,37 @@ export async function decryptJSON(box, pass) {
   const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: fromB64(box.iv) }, key, fromB64(box.data));
   return JSON.parse(td.decode(pt));
 }
+
+// A random AES key stored inside the encrypted trip data. Photos and notes are
+// encrypted with it directly, so they don't each need a slow PBKDF2 derivation.
+
+export async function newContentKey() {
+  return toB64(crypto.getRandomValues(new Uint8Array(32)));
+}
+
+export function importContentKey(b64) {
+  return crypto.subtle.importKey('raw', fromB64(b64), 'AES-GCM', false, ['encrypt', 'decrypt']);
+}
+
+// Output layout: 12-byte IV followed by the ciphertext.
+export async function encryptBytes(key, bytes) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, bytes));
+  const out = new Uint8Array(12 + ct.length);
+  out.set(iv);
+  out.set(ct, 12);
+  return out;
+}
+
+export async function decryptBytes(key, bytes) {
+  const b = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+  return new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b.subarray(0, 12) }, key, b.subarray(12)));
+}
+
+export async function encryptText(key, text) {
+  return toB64(await encryptBytes(key, te.encode(text)));
+}
+
+export async function decryptText(key, b64) {
+  return td.decode(await decryptBytes(key, fromB64(b64)));
+}

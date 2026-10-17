@@ -3,20 +3,29 @@
 Travel companion for a trip to Sri Lanka. It is a web app
 that installs on an iPhone from Safari (Share › Add to Home Screen) and works offline.
 
-Tabs: **Reis** (day by day program), **Boekingen**, **Nood** (emergency numbers,
-Belgian embassy and consulate, tap to call, share location) and **Lezen**
-(literary companion: passages by nearby place or search term).
+Screens: **Start**, **Reisplan** (a page per day with the full program, photos
+and notes), **Notities** (all notes by day, author and place), **Lezen** (literary
+companion: passages by nearby place or search term), **Boekingen** and **Nood**
+(emergency numbers, Belgian embassy and consulate, tap to call, share location).
 
 ## Private data
 
 All trip details live in `data/trip.enc.json`, encrypted with a passphrase
-(PBKDF2 + AES-GCM, see `crypto.js`). The plaintext `private/trip.json` is
-git-ignored and never committed.
+(PBKDF2 + AES-GCM, see `crypto.js`). Photos are in `data/img/`, encrypted with a
+random content key stored inside the trip data. The plaintext `private/` folder
+is git-ignored and never committed.
+
+## Shared notes
+
+Notes are saved on each phone. When the trip data contains a `sync` entry
+(`owner`, `repo`, `branch`, `token`: a fine-grained GitHub token with Contents
+read/write on this repository only), notes are also stored encrypted as
+`notes/<id>.json` on that branch, so both phones see each other's notes.
 
 ```sh
-TRIP_PASSPHRASE='...' node tools/vault.mjs decrypt   # data/trip.enc.json -> private/trip.json
+TRIP_PASSPHRASE='...' node tools/vault.mjs decrypt   # data/ -> private/ (trip.json and img/)
 # edit private/trip.json
-TRIP_PASSPHRASE='...' node tools/vault.mjs encrypt   # private/trip.json -> data/trip.enc.json
+TRIP_PASSPHRASE='...' node tools/vault.mjs encrypt   # private/ -> data/
 ```
 
 ## Literary passages

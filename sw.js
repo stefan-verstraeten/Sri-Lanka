@@ -1,7 +1,9 @@
 // Offline support. App files: served from cache, refreshed in the background.
 // Trip data: network first so updates arrive, cache when offline.
+// Photos: cached once, kept forever.
 
-const CACHE = 'sri-lanka-v1';
+const CACHE = 'sri-lanka-v2';
+const PHOTOS = 'sri-lanka-photos';
 const SHELL = [
   './',
   'index.html',
@@ -9,6 +11,7 @@ const SHELL = [
   'app.js',
   'crypto.js',
   'places.js',
+  'notes.js',
   'manifest.webmanifest',
   'icons/icon-180.png',
   'icons/icon-192.png',
@@ -23,7 +26,7 @@ self.addEventListener('install', (e) => {
 self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE && k !== PHOTOS).map((k) => caches.delete(k))))
       .then(() => self.clients.claim()),
   );
 });
@@ -40,6 +43,18 @@ self.addEventListener('fetch', (e) => {
 
   if (url.pathname.endsWith('/data/trip.enc.json')) {
     e.respondWith(fresh(e.request).catch(() => caches.match(e.request, { ignoreSearch: true })));
+    return;
+  }
+
+  // Encrypted photos never change (their name is a content hash): cache forever.
+  if (url.pathname.includes('/data/img/')) {
+    e.respondWith(caches.open(PHOTOS).then(async (c) => {
+      const hit = await c.match(e.request);
+      if (hit) return hit;
+      const res = await fetch(e.request);
+      if (res.ok) c.put(e.request, res.clone());
+      return res;
+    }));
     return;
   }
 

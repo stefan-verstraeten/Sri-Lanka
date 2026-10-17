@@ -32,6 +32,7 @@
     </section>
 
     <header id="top" class="top" hidden>
+      <a id="back" class="back" href="#/" hidden aria-label="Terug">‹</a>
       <div>
         <h1 id="top-title">Sri Lanka</h1>
         <p id="top-sub" class="top-sub"></p>
@@ -41,10 +42,11 @@
     <main id="view" hidden></main>
 
     <nav id="tabs" class="tabs" hidden>
-      <button data-tab="reis"><svg viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h10"/></svg><span>Reis</span></button>
-      <button data-tab="boekingen"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M8 6V4h8v2"/></svg><span>Boekingen</span></button>
-      <button data-tab="nood"><svg viewBox="0 0 24 24"><path d="M12 3l9 16H3z"/><path d="M12 10v4M12 17v.01"/></svg><span>Nood</span></button>
-      <button data-tab="lezen"><svg viewBox="0 0 24 24"><path d="M3 5c3-1 6-1 9 1 3-2 6-2 9-1v14c-3-1-6-1-9 1-3-2-6-2-9-1z"/><path d="M12 6v14"/></svg><span>Lezen</span></button>
+      <a href="#/" data-tab="start"><svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></svg><span>Start</span></a>
+      <a href="#/reis" data-tab="reis"><svg viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h10"/></svg><span>Reisplan</span></a>
+      <a href="#/notities" data-tab="notities"><svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13 7l4 4"/></svg><span>Notities</span></a>
+      <a href="#/lezen" data-tab="lezen"><svg viewBox="0 0 24 24"><path d="M3 5c3-1 6-1 9 1 3-2 6-2 9-1v14c-3-1-6-1-9 1-3-2-6-2-9-1z"/><path d="M12 6v14"/></svg><span>Lezen</span></a>
+      <a href="#/nood" data-tab="nood"><svg viewBox="0 0 24 24"><path d="M12 3l9 16H3z"/><path d="M12 10v4M12 17v.01"/></svg><span>Nood</span></a>
     </nav>
   </div>
 </body>
