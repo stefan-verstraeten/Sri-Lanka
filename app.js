@@ -371,7 +371,8 @@ function passageCard(p, f) {
   return `
     <article class="card passage">
       ${p.title ? `<h3 style="margin-bottom:8px">${esc(p.title)}</h3>` : ''}
-      <blockquote>${esc(p.text)}</blockquote>
+      <blockquote${p.text.length > 900 ? ' class="long"' : ''}>${esc(p.text)}</blockquote>
+      ${p.text.length > 900 ? '<button class="link more" data-more>Lees verder</button>' : ''}
       ${where ? `<cite>${where}</cite>` : ''}
       <div class="foot">
         <div class="tags">${chips}</div>
@@ -539,9 +540,12 @@ function wire() {
   setInterval(() => { if (!document.hidden) NOTES.syncNow(); }, 120000);
 
   $('#view').addEventListener('click', (e) => {
-    const t = e.target.closest('[data-read],[data-fav],[data-copy],[data-me],[data-who],[data-edit],[data-del],#near,#favs,#share-loc,#note-cancel');
+    const t = e.target.closest('[data-more],[data-read],[data-fav],[data-copy],[data-me],[data-who],[data-edit],[data-del],#near,#favs,#share-loc,#note-cancel');
     if (!t) return;
-    if (t.dataset.read) { e.preventDefault(); readAbout(t.dataset.read); }
+    if (t.dataset.more !== undefined) {
+      const open = t.previousElementSibling.classList.toggle('open');
+      t.textContent = open ? 'Minder tonen' : 'Lees verder';
+    } else if (t.dataset.read) { e.preventDefault(); readAbout(t.dataset.read); }
     else if (t.dataset.fav) {
       const f = favs();
       f.has(t.dataset.fav) ? f.delete(t.dataset.fav) : f.add(t.dataset.fav);

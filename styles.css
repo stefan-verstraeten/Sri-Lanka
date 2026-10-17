@@ -151,7 +151,8 @@ main { padding: 12px 16px calc(var(--tabs-h) + env(safe-area-inset-bottom) + 20p
 /* Reading companion */
 .search { display: grid; grid-template-columns: 1fr auto; gap: 8px; position: sticky; top: 0; }
 .search input { font: inherit; font-size: 17px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); color: var(--ink); min-width: 0; }
-.filters { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.filters { display: flex; gap: 8px; margin: 10px -16px 0; padding: 0 16px 4px; overflow-x: auto; scrollbar-width: none; }
+.filters .chip { flex: none; }
 .status { margin: 14px 4px 4px; font-size: 14px; color: var(--muted); }
 .passage blockquote { margin: 0; font-family: "Iowan Old Style", "Palatino", Georgia, serif; font-size: 17px; line-height: 1.55; white-space: pre-line; }
 .passage cite { display: block; margin-top: 10px; font-style: normal; font-size: 13px; color: var(--muted); }
@@ -227,3 +228,6 @@ body[data-route="start"] main { padding-top: 0; }
 .pager { display: flex; justify-content: space-between; padding: 16px 0; }
 .section-title a { color: inherit; text-decoration: none; }
 .sync-error { color: var(--danger); }
+
+.passage blockquote.long:not(.open) { max-height: 15em; overflow: hidden; -webkit-mask-image: linear-gradient(#000 65%, transparent); mask-image: linear-gradient(#000 65%, transparent); }
+.passage .more { margin-top: 6px; font-size: 15px; }
