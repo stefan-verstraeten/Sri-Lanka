@@ -355,7 +355,7 @@ function viewDag(iso) {
 
   return `
     <article class="day-page">
-      ${hero ? `<div class="hero"><img data-img="${esc(hero)}" alt=""></div>` : ''}
+      ${hero ? `<div class="hero"><img data-img="${esc(hero)}" alt="">${day.heroCredit && hero === day.heroImg ? `<small class="credit">${esc(day.heroCredit)}</small>` : ''}</div>` : ''}
       <header class="day-title">
         <div class="eyebrow">Dag ${day.n} · ${esc(fmt(day.d, { weekday: 'long', day: 'numeric', month: 'long' }))}</div>
         <h2>${esc(day.title)}</h2>
@@ -1086,7 +1086,7 @@ function showLock(box, msg = '') {
 // iPhone home-screen apps are often resumed rather than restarted, so check for
 // a new version whenever the app comes to the foreground and reload into it,
 // unless a note is being typed.
-const APP_VERSION = '2026-10-17.9';
+const APP_VERSION = '2026-10-17.10';
 
 const APP_FILES = ['./', 'index.html', 'styles.css', 'app.js', 'crypto.js', 'places.js', 'notes.js', 'media.js', 'reel.js', 'live.js', 'manifest.webmanifest', 'data/trip.enc.json'];
 
