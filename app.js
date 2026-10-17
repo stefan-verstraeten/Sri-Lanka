@@ -191,16 +191,18 @@ function noteMeta(n) {
     bits.splice(1, 0, esc(fmt(d, { weekday: 'short', day: 'numeric', month: 'short' })));
   }
   const where = n.place ? (n.lat != null ? `<a href="${mapsAt(n.lat, n.lon, n.place)}">${esc(n.place)}</a>` : esc(n.place)) : '';
-  return `${bits.join(' · ')}${where ? ` · 📍 ${where}` : ''}`;
+  return `${bits.join(' · ')}${where ? ` · 📍 ${where}` : ''}${n.private ? ' · 🔒 privé, niet in de reel' : ''}`;
 }
+
+const privateBtn = (n) => `<button class="btn small" data-private="${esc(n.id)}">${n.private ? '🔓 Privé uit' : '🔒 Privé'}</button>`;
 
 function noteCard(n, { actions = true } = {}) {
   const mine = n.author === store.get('me');
   return `
-    <article class="card note-card" data-note="${esc(n.id)}">
+    <article class="card note-card${n.private ? ' private' : ''}" data-note="${esc(n.id)}">
       <div class="note-text">${paras(n.text)}</div>
       <div class="note-meta">${noteMeta(n)}</div>
-      ${mine && actions ? `<div class="btn-row"><button class="btn small" data-edit="${esc(n.id)}">Bewerk</button><button class="btn small" data-del="${esc(n.id)}">Verwijder</button></div>` : ''}
+      ${mine && actions ? `<div class="btn-row"><button class="btn small" data-edit="${esc(n.id)}">Bewerk</button>${privateBtn(n)}<button class="btn small" data-del="${esc(n.id)}">Verwijder</button></div>` : ''}
     </article>`;
 }
 
@@ -213,7 +215,7 @@ const selecting = { date: null, ids: new Set() };
 function photoGrid(list, { selectable = false } = {}) {
   if (!list.length) return '';
   const on = selectable && selecting.date === list[0].date;
-  return `<div class="photo-grid${on ? ' selecting' : ''}">${list.map((ph) => `<button class="pthumb${on && selecting.ids.has(ph.id) ? ' picked' : ''}" data-photo="${esc(ph.id)}" aria-label="Foto"><img data-ph="${esc(ph.id)}" alt=""></button>`).join('')}</div>`;
+  return `<div class="photo-grid${on ? ' selecting' : ''}">${list.map((ph) => `<button class="pthumb${on && selecting.ids.has(ph.id) ? ' picked' : ''}${ph.private ? ' private' : ''}" data-photo="${esc(ph.id)}" aria-label="Foto"><img data-ph="${esc(ph.id)}" alt=""></button>`).join('')}</div>`;
 }
 
 function dayNotesHtml(iso) {
@@ -704,7 +706,7 @@ async function openPhoto(id) {
     ${ph.caption ? `<p class="caption">${esc(ph.caption)}</p>` : ''}
     <div class="note-meta">${noteMeta(ph)}</div>
     <div class="btn-row">
-      ${mine ? `<button class="btn small" data-caption="${esc(id)}">Bijschrift</button>` : ''}
+      ${mine ? `<button class="btn small" data-caption="${esc(id)}">Bijschrift</button>${privateBtn(ph)}` : ''}
       ${store.get('me') ? `<button class="btn small danger" data-delphoto="${esc(id)}">Verwijder</button>` : ''}
       <button class="btn small primary" data-close>Sluiten</button>
     </div>`);
@@ -814,12 +816,19 @@ async function showFlight(no, iso) {
   }
 }
 
+// Private notes and photos stay in the app but are left out of the reel and the day card.
+function togglePrivate(id) {
+  const n = NOTES.list().find((x) => x.id === id);
+  if (n) NOTES.save({ ...n, private: !n.private });
+}
+
 let lastReel = null;
 
 async function makeDayReel(iso, asCard = false) {
   const day = tripDays().find((d) => d.iso === iso);
-  const entries = NOTES.list().filter((n) => n.date === iso).sort((a, b) => a.created.localeCompare(b.created));
-  if (!entries.length) { toast('Voeg eerst foto’s of notities toe aan deze dag.'); return; }
+  const all = NOTES.list().filter((n) => n.date === iso);
+  const entries = all.filter((n) => !n.private).sort((a, b) => a.created.localeCompare(b.created));
+  if (!entries.length) { toast(all.length ? 'Alles van deze dag staat op privé.' : 'Voeg eerst foto’s of notities toe aan deze dag.'); return; }
   const recording = !asCard && canRecord();
   overlay(`
     <h3>${recording ? 'Dagreel maken' : 'Dagkaart maken'}</h3>
@@ -877,7 +886,7 @@ async function shareReel() {
 }
 
 function onOverlayClick(e) {
-  const t = e.target.closest('[data-close],[data-caption],[data-delphoto],[data-share-reel],[data-card],[data-hist]');
+  const t = e.target.closest('[data-close],[data-caption],[data-delphoto],[data-private],[data-share-reel],[data-card],[data-hist]');
   if (e.target.id === 'overlay') { closeOverlay(); return; }
   if (!t) return;
   if (t.dataset.close !== undefined) closeOverlay();
@@ -889,6 +898,7 @@ function onOverlayClick(e) {
     if (confirm('Deze foto verwijderen? Ook op de andere telefoon.')) { NOTES.remove(t.dataset.delphoto); closeOverlay(); }
   } else if (t.dataset.shareReel !== undefined) shareReel();
   else if (t.dataset.card) makeDayReel(t.dataset.card, true);
+  else if (t.dataset.private) { togglePrivate(t.dataset.private); openPhoto(t.dataset.private); }
   else if (t.dataset.hist) showHistory(t.dataset.hist, t.dataset.histday === '1');
 }
 
@@ -899,7 +909,7 @@ function wire() {
   setInterval(() => { if (!document.hidden) NOTES.syncNow(); }, 120000);
 
   $('#view').addEventListener('click', (e) => {
-    const t = e.target.closest('[data-live-news],[data-live-history],[data-flight],[data-refresh],[data-select],[data-select-all],[data-select-done],[data-del-selected],[data-photo],[data-src],#make-reel,[data-zoom],[data-more],[data-read],[data-fav],[data-copy],[data-me],[data-who],[data-edit],[data-del],#near,#favs,#share-loc,#note-cancel');
+    const t = e.target.closest('[data-live-news],[data-live-history],[data-flight],[data-refresh],[data-select],[data-select-all],[data-select-done],[data-del-selected],[data-photo],[data-src],#make-reel,[data-zoom],[data-more],[data-read],[data-fav],[data-copy],[data-me],[data-who],[data-edit],[data-private],[data-del],#near,#favs,#share-loc,#note-cancel');
     if (!t) return;
     if (t.dataset.liveNews) showNews(t.dataset.liveNews);
     else if (t.dataset.liveHistory) showHistory(t.dataset.liveHistory);
@@ -952,7 +962,8 @@ function wire() {
       editingNote = t.dataset.edit;
       render({ keepScroll: true });
       $('#note-text')?.focus();
-    } else if (t.dataset.del) {
+    } else if (t.dataset.private) togglePrivate(t.dataset.private);
+    else if (t.dataset.del) {
       if (confirm('Deze notitie verwijderen?')) NOTES.remove(t.dataset.del);
     } else if (t.id === 'note-cancel') { editingNote = null; render({ keepScroll: true }); }
     else if (t.id === 'near') nearMe();
@@ -1017,7 +1028,7 @@ function showLock(box, msg = '') {
 // iPhone home-screen apps are often resumed rather than restarted, so check for
 // a new version whenever the app comes to the foreground and reload into it,
 // unless a note is being typed.
-const APP_VERSION = '2026-10-17.5';
+const APP_VERSION = '2026-10-17.6';
 
 const APP_FILES = ['./', 'index.html', 'styles.css', 'app.js', 'crypto.js', 'places.js', 'notes.js', 'media.js', 'reel.js', 'live.js', 'manifest.webmanifest', 'data/trip.enc.json'];
 
