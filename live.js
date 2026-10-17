@@ -2,6 +2,8 @@
 // Sri Lankan history on today's date, and flight status. All of these need
 // internet; callers show fallback links when a service can't be reached.
 
+const fold = (t) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
 const SL = /Sri Lanka|Sri Lankan|Ceylon|Sinhal|Tamil Tiger|LTTE|Colombo|Kandy|Kandyan|Jaffna|Trincomalee|Galle|Anuradhapura|Polonnaruwa|Sigiriya|Batticaloa|Negombo|Nuwara Eliya|Bandaranaike|Rajapaksa|Kotelawala|Jayewardene|Premadasa|Wickremesinghe|Dissanayake|Sirisena|Kumaratunga/i;
 
 async function getJSON(url, opts = {}) {
@@ -67,20 +69,27 @@ export async function onThisDay(month, day) {
   const d = await getJSON(`https://en.wikipedia.org/api/rest_v1/feed/onthisday/all/${mm}/${dd}`, {
     headers: { 'Api-User-Agent': 'SriLankaTravelCompanion/1.0 (personal trip app)' },
   });
-  const seen = new Set();
+  // The feed repeats events across its lists (and sometimes in other words):
+  // treat entries from the same year about the same article, or with mostly
+  // the same words, as one.
+  const words = (t) => new Set(fold(t).split(/[^a-z0-9]+/).filter((w) => w.length > 3));
+  const overlap = (a, b) => { let n = 0; for (const w of a) if (b.has(w)) n++; return n / Math.max(1, Math.min(a.size, b.size)); };
   const all = [];
   for (const kind of ['selected', 'events', 'births', 'deaths', 'holidays']) {
     for (const e of d[kind] || []) {
-      if (seen.has(e.text)) continue;
-      seen.add(e.text);
       const page = e.pages?.[0];
+      const title = page?.titles?.normalized || page?.title?.replace(/_/g, ' ') || '';
+      const w = words(e.text);
+      if (all.some((x) => x.year === e.year && ((title && x.page === title) || overlap(x.w, w) > 0.6))) continue;
+      const extract = page?.extract || '';
       all.push({
         kind,
         year: e.year,
         text: e.text,
+        w,
         url: page?.content_urls?.mobile?.page,
-        page: page?.titles?.normalized || page?.title?.replace(/_/g, ' ') || '',
-        extract: page?.extract || '',
+        page: title,
+        extract: extract && overlap(words(extract.split(/(?<=\.)\s/)[0]), w) < 0.5 ? extract : '',
         sl: SL.test(e.text) || (e.pages || []).some((p) => SL.test(`${p.title} ${p.description || ''}`)),
       });
     }
