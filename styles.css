@@ -177,11 +177,12 @@ main { padding: 12px 16px calc(var(--tabs-h) + env(safe-area-inset-bottom) + 20p
 /* Start screen */
 body[data-route="start"] main { padding-top: 0; }
 .start-hero {
-  position: relative; margin: 0 -16px; height: min(62vh, 520px); overflow: hidden; background: var(--brand);
+  position: relative; display: block; margin: 0 -16px; overflow: hidden; background: #e8dcc0;
+  padding-top: env(safe-area-inset-top);
 }
-.start-hero img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.start-hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to bottom, rgb(0 0 0 / 0) 45%, rgb(0 0 0 / .62)); }
-.start-title { position: absolute; left: 20px; right: 20px; bottom: 20px; z-index: 1; color: #fff; }
+.start-hero img { width: 100%; height: auto; display: block; }
+.start-hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to bottom, rgb(0 0 0 / 0) 55%, rgb(0 0 0 / .6)); }
+.start-title { position: absolute; left: 20px; right: 20px; bottom: 34px; z-index: 1; color: #fff; text-shadow: 0 1px 6px rgb(0 0 0 / .5); }
 .start-title h1 { font-family: "Iowan Old Style", Palatino, Georgia, serif; font-size: 46px; font-weight: 600; letter-spacing: .01em; }
 .start-title p { margin: 4px 0 0; font-size: 16px; opacity: .9; }
 .today-card { display: block; text-decoration: none; color: inherit; margin-top: -24px; position: relative; z-index: 2; }
@@ -231,3 +232,9 @@ body[data-route="start"] main { padding-top: 0; }
 
 .passage blockquote.long:not(.open) { max-height: 15em; overflow: hidden; -webkit-mask-image: linear-gradient(#000 65%, transparent); mask-image: linear-gradient(#000 65%, transparent); }
 .passage .more { margin-top: 6px; font-size: 15px; }
+
+/* Old map */
+.map-tools { display: flex; gap: 8px; justify-content: flex-end; margin-bottom: 8px; }
+.map-scroll { overflow: auto; -webkit-overflow-scrolling: touch; border-radius: 12px; border: 1px solid var(--line); background: #e8dcc0; height: 62vh; margin: 0 -4px; }
+.map-scroll img { display: block; max-width: none; height: auto; }
+.lock-map { width: 100%; border-radius: 14px; box-shadow: var(--shadow); display: block; }

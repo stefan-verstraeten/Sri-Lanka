@@ -2,7 +2,7 @@
 // Trip data: network first so updates arrive, cache when offline.
 // Photos: cached once, kept forever.
 
-const CACHE = 'sri-lanka-v2';
+const CACHE = 'sri-lanka-v3';
 const PHOTOS = 'sri-lanka-photos';
 const SHELL = [
   './',
@@ -12,6 +12,8 @@ const SHELL = [
   'crypto.js',
   'places.js',
   'notes.js',
+  'img/map-small.jpg',
+  'img/map.jpg',
   'manifest.webmanifest',
   'icons/icon-180.png',
   'icons/icon-192.png',

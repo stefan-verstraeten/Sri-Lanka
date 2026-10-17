@@ -140,13 +140,13 @@ function viewStart() {
   ];
   return `
     <section class="start">
-      <div class="start-hero">
-        ${DATA.trip.startImgPublic ? `<img src="${esc(DATA.trip.startImgPublic)}" alt="">` : `<img data-img="${esc(DATA.trip.heroImg || '')}" alt="">`}
+      <a class="start-hero" href="#/kaart" aria-label="Bekijk de oude kaart">
+        <img src="img/map-small.jpg" alt="Kaart van Ceylon, 1692">
         <div class="start-title">
           <h1>Sri Lanka</h1>
           <p>${esc(tripStatus())}</p>
         </div>
-      </div>
+      </a>
       ${!me ? `
         <div class="card who">
           <h3>Wie gebruikt deze telefoon?</h3>
@@ -275,6 +275,19 @@ function viewDag(iso) {
       </nav>
     </article>`;
 }
+
+function viewKaart() {
+  return `
+    <p class="note" style="margin:4px 4px 10px"><b>Het Coninkryk Conde Uda of Ceylon</b>, kaart naar Robert Knox, 1692. Knox was negentien jaar gevangene van de koning van Kandy (1660–1679). Let op: het oosten ligt boven, het westen onder. Sleep om rond te kijken.</p>
+    <div class="map-tools">
+      <button class="btn small" data-zoom="-1">−</button>
+      <button class="btn small" data-zoom="1">+</button>
+    </div>
+    <div class="map-scroll"><img id="bigmap" src="img/map.jpg" alt="Kaart van Ceylon, 1692" style="width:${mapZoom * 100}%"></div>
+    <p class="note" style="margin:10px 4px">Rijksmuseum Amsterdam, RP-P-1896-A-19368-920. Publiek domein (CC0), via Wikimedia Commons.</p>`;
+}
+
+let mapZoom = 2.5;
 
 function viewNotities() {
   const people = DATA.trip.people || [];
@@ -435,6 +448,7 @@ const ROUTES = {
   lezen: { tab: 'lezen', title: 'Lezen', view: viewLezen },
   boekingen: { tab: 'start', title: 'Boekingen', view: viewBoekingen, back: '#/' },
   nood: { tab: 'nood', title: 'Nood', view: viewNood },
+  kaart: { tab: 'start', title: 'Ceylon, 1692', view: viewKaart, back: '#/' },
 };
 
 function currentRoute() {
@@ -540,9 +554,12 @@ function wire() {
   setInterval(() => { if (!document.hidden) NOTES.syncNow(); }, 120000);
 
   $('#view').addEventListener('click', (e) => {
-    const t = e.target.closest('[data-more],[data-read],[data-fav],[data-copy],[data-me],[data-who],[data-edit],[data-del],#near,#favs,#share-loc,#note-cancel');
+    const t = e.target.closest('[data-zoom],[data-more],[data-read],[data-fav],[data-copy],[data-me],[data-who],[data-edit],[data-del],#near,#favs,#share-loc,#note-cancel');
     if (!t) return;
-    if (t.dataset.more !== undefined) {
+    if (t.dataset.zoom) {
+      mapZoom = Math.min(5, Math.max(1, mapZoom + Number(t.dataset.zoom) * 0.75));
+      $('#bigmap').style.width = `${mapZoom * 100}%`;
+    } else if (t.dataset.more !== undefined) {
       const open = t.previousElementSibling.classList.toggle('open');
       t.textContent = open ? 'Minder tonen' : 'Lees verder';
     } else if (t.dataset.read) { e.preventDefault(); readAbout(t.dataset.read); }
