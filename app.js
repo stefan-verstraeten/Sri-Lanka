@@ -3,6 +3,7 @@ import { placeById, findPlaces, nearestPlaces, fold } from './places.js';
 import { createNotes } from './notes.js';
 import { media, preparePhoto } from './media.js';
 import { canRecord, makeReel, makeCard } from './reel.js';
+import { placeName, localNews, onThisDay, flightStatus, flightLinks } from './live.js';
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -206,16 +207,34 @@ function noteCard(n, { actions = true } = {}) {
 const textNotes = () => NOTES.list().filter((n) => n.type !== 'photo');
 const allPhotos = () => NOTES.list().filter((n) => n.type === 'photo');
 
-function photoGrid(list) {
+// Selecting photos to delete several at once (per day page).
+const selecting = { date: null, ids: new Set() };
+
+function photoGrid(list, { selectable = false } = {}) {
   if (!list.length) return '';
-  return `<div class="photo-grid">${list.map((ph) => `<button class="pthumb" data-photo="${esc(ph.id)}" aria-label="Foto"><img data-ph="${esc(ph.id)}" alt=""></button>`).join('')}</div>`;
+  const on = selectable && selecting.date === list[0].date;
+  return `<div class="photo-grid${on ? ' selecting' : ''}">${list.map((ph) => `<button class="pthumb${on && selecting.ids.has(ph.id) ? ' picked' : ''}" data-photo="${esc(ph.id)}" aria-label="Foto"><img data-ph="${esc(ph.id)}" alt=""></button>`).join('')}</div>`;
 }
 
 function dayNotesHtml(iso) {
   const photos = allPhotos().filter((n) => n.date === iso);
   const notes = textNotes().filter((n) => n.date === iso);
   if (!photos.length && !notes.length) return '<p class="note">Nog geen foto’s of notities voor deze dag.</p>';
-  return photoGrid(photos) + notes.map((n) => noteCard(n)).join('');
+  const on = selecting.date === iso;
+  const tools = photos.length && store.get('me') ? `
+    <div class="photo-tools">
+      ${on ? `<span class="note">${selecting.ids.size} geselecteerd</span>
+        <button class="btn small" data-select-all="${iso}">Alles</button>
+        <button class="btn small danger" data-del-selected="${iso}"${selecting.ids.size ? '' : ' disabled'}>Verwijder</button>
+        <button class="btn small" data-select-done>Klaar</button>`
+      : `<button class="link" data-select="${iso}">Foto’s selecteren om te verwijderen</button>`}
+    </div>` : '';
+  return photoGrid(photos, { selectable: true }) + tools + notes.map((n) => noteCard(n)).join('');
+}
+
+function refreshDayNotes() {
+  const box = $('#day-notes');
+  if (box) { box.innerHTML = dayNotesHtml(currentRoute().arg); hydratePhotos(box); }
 }
 
 // Photo thumbnails come from the phone (or once from the other phone's upload).
@@ -247,9 +266,13 @@ function viewDag(iso) {
   const flights = (day.flights || []).map((f) => `
     <div class="flight">
       <div><b>${esc(f.dep)}</b><small>${esc(f.from)}</small></div>
-      <div class="dur">✈︎<br>${esc(f.dur)}</div>
+      <div class="dur">✈︎ ${esc(f.no || '')}<br>${esc(f.dur)}</div>
       <div class="end"><b>${esc(f.arr)}</b><small>${esc(f.to)}</small></div>
-    </div>`).join('');
+    </div>
+    ${f.no ? `<div class="flight-live">
+      <button class="btn small primary" data-flight="${esc(f.no)}" data-date="${day.iso}">🛫 Live: gate &amp; status</button>
+      ${f.noUnconfirmed ? '<span class="note">Vluchtnummer nog niet bevestigd: controleer op je e-ticket.</span>' : ''}
+    </div>` : ''}`).join('');
 
   const items = (day.items || []).map((it, k) => `
     <section class="block">
@@ -283,6 +306,13 @@ function viewDag(iso) {
       </header>
       ${flights}${items}${stay}
       ${reads ? `<section class="block"><div class="eyebrow">Lezen over</div><div class="btn-row">${reads}</div></section>` : ''}
+      <section class="block">
+        <div class="eyebrow">Ter plaatse</div>
+        <div class="btn-row">
+          <button class="btn" data-live-news="${day.iso}">📰 Lokaal nieuws</button>
+          <button class="btn" data-live-history="${day.iso}">📜 Op deze dag</button>
+        </div>
+      </section>
       <section class="block notes-block">
         <h3>Foto’s & notities</h3>
         <div id="day-notes">${dayNotesHtml(day.iso)}</div>
@@ -544,6 +574,8 @@ function render({ keepScroll = false } = {}) {
 
 function onRoute() {
   editingNote = null;
+  selecting.date = null;
+  selecting.ids.clear();
   closeOverlay();
   render();
   if (['notities', 'dag', ''].includes(currentRoute().name)) NOTES.syncNow();
@@ -556,8 +588,7 @@ function onRoute() {
 function onNotesChange() {
   const { name } = currentRoute();
   if (name === 'dag') {
-    const box = $('#day-notes');
-    if (box) { box.innerHTML = dayNotesHtml(currentRoute().arg); hydratePhotos(box); }
+    refreshDayNotes();
   } else if (name === 'notities' || name === '') {
     render({ keepScroll: true });
   }
@@ -673,11 +704,114 @@ async function openPhoto(id) {
     ${ph.caption ? `<p class="caption">${esc(ph.caption)}</p>` : ''}
     <div class="note-meta">${noteMeta(ph)}</div>
     <div class="btn-row">
-      ${mine ? `<button class="btn small" data-caption="${esc(id)}">Bijschrift</button><button class="btn small" data-delphoto="${esc(id)}">Verwijder</button>` : ''}
+      ${mine ? `<button class="btn small" data-caption="${esc(id)}">Bijschrift</button>` : ''}
+      ${store.get('me') ? `<button class="btn small danger" data-delphoto="${esc(id)}">Verwijder</button>` : ''}
       <button class="btn small primary" data-close>Sluiten</button>
     </div>`);
   const url = await photoUrl(id);
   if (url && $('#big-photo')) $('#big-photo').src = url;
+}
+
+/* ---------- live: local news, on this day, flights ---------- */
+
+const fmtShort = (d) => d.toLocaleDateString('nl-BE', { day: 'numeric', month: 'long' });
+
+function newsLinks(place) {
+  const q = encodeURIComponent(`${place || ''} Sri Lanka`.trim());
+  return `
+    <div class="eyebrow" style="margin-top:14px">Verder lezen</div>
+    <div class="btn-row">
+      <a class="btn small" href="https://news.google.com/search?q=${q}&hl=en-LK&gl=LK&ceid=LK:en" target="_blank" rel="noopener">Google Nieuws</a>
+      <a class="btn small" href="https://www.adaderana.lk/" target="_blank" rel="noopener">Ada Derana</a>
+      <a class="btn small" href="https://www.dailymirror.lk/" target="_blank" rel="noopener">Daily Mirror</a>
+      <a class="btn small" href="https://www.newsfirst.lk/" target="_blank" rel="noopener">News 1st</a>
+    </div>`;
+}
+
+async function showNews(iso) {
+  overlay(`<h3>📰 Lokaal nieuws</h3><p class="note" id="live-status">Locatie bepalen…</p><div id="live-out"></div>
+    <div class="btn-row"><button class="btn small" data-close>Sluiten</button></div>`);
+  const set = (id, html) => { const el = document.getElementById(id); if (el) el.innerHTML = html; };
+  let where = { town: dayPlace(iso), district: '' };
+  try {
+    const c = await getPosition(10000);
+    set('live-status', 'Plaats opzoeken…');
+    try { where = await placeName(c.latitude, c.longitude); } catch {
+      const near = nearestPlaces(c.latitude, c.longitude, 1)[0];
+      where = { town: near?.name || where.town, district: '' };
+    }
+  } catch {
+    set('live-status', `Geen locatie; nieuws over ${esc(where.town)} (dagprogramma).`);
+  }
+  set('live-status', `Nieuws zoeken rond ${esc([where.town, where.district].filter(Boolean).join(', ') || 'Sri Lanka')}…`);
+  try {
+    const res = await localNews(where);
+    const list = res.items.slice(0, 15).map((a) => `
+      <a class="news-item" href="${esc(a.url)}" target="_blank" rel="noopener">
+        <b>${esc(a.title)}</b>
+        <small>${esc(a.source || '')}${a.date ? ` · ${esc(a.date.toLocaleDateString('nl-BE', { day: 'numeric', month: 'short' }))}` : ''}</small>
+      </a>`).join('');
+    set('live-status', res.items.length ? `Recent nieuws: ${esc(res.scope)}` : 'Geen recente berichten gevonden.');
+    set('live-out', list + newsLinks(where.town));
+  } catch (e) {
+    set('live-status', `Het nieuws kon niet geladen worden (${esc(e.message || 'geen verbinding')}).`);
+    set('live-out', newsLinks(where.town));
+  }
+}
+
+async function showHistory(iso, useDayDate = false) {
+  const tripDate = parseDate(iso);
+  const date = useDayDate ? tripDate : new Date();
+  const other = isoOf(tripDate) !== todayIso();
+  overlay(`<h3>📜 Op ${esc(fmtShort(date))}</h3>
+    ${other ? `<div class="filters"><button class="chip${useDayDate ? '' : ' on'}" data-hist="${iso}" data-histday="0">Vandaag</button><button class="chip${useDayDate ? ' on' : ''}" data-hist="${iso}" data-histday="1">Deze reisdag (${esc(fmtShort(tripDate))})</button></div>` : ''}
+    <p class="note" id="live-status">Wikipedia raadplegen…</p><div id="live-out"></div>
+    <div class="btn-row"><button class="btn small" data-close>Sluiten</button></div>`);
+  const set = (id, html) => { const el = document.getElementById(id); if (el) el.innerHTML = html; };
+  try {
+    const r = await onThisDay(date.getMonth() + 1, date.getDate());
+    const row = (x) => `<div class="hist-item"><b>${x.year ?? ''}</b><span>${esc(x.text)}${x.url ? ` <a href="${esc(x.url)}" target="_blank" rel="noopener">›</a>` : ''}</span></div>`;
+    if (r.sl.length) {
+      set('live-status', `Sri Lanka op ${esc(fmtShort(date))}`);
+      set('live-out', r.sl.map(row).join(''));
+    } else {
+      set('live-status', `Wikipedia’s kalender vermeldt voor ${esc(fmtShort(date))} niets over Sri Lanka. Wel elders in de wereld:`);
+      set('live-out', r.world.slice(0, 8).map(row).join(''));
+    }
+  } catch (e) {
+    set('live-status', `Wikipedia kon niet geladen worden (${esc(e.message || 'geen verbinding')}).`);
+  }
+}
+
+async function showFlight(no, iso) {
+  const key = DATA.flightApiKey;
+  const links = flightLinks(no).map(([n, u]) => `<a class="btn small" href="${esc(u)}" target="_blank" rel="noopener">${esc(n)}</a>`).join('');
+  overlay(`<h3>🛫 ${esc(no)} · ${esc(fmtShort(parseDate(iso)))}</h3>
+    <p class="note" id="live-status">${key ? 'Live gegevens ophalen…' : 'Gate, terminal en vertraging staan live op deze pagina’s:'}</p>
+    <div id="live-out"></div>
+    <div class="btn-row">${links}</div>
+    <div class="btn-row"><button class="btn small" data-close>Sluiten</button></div>`);
+  if (!key) return;
+  const set = (id, html) => { const el = document.getElementById(id); if (el) el.innerHTML = html; };
+  try {
+    const f = await flightStatus(no, iso, key);
+    const t = (x) => (x ? x.slice(11, 16) : '');
+    const leg = (label, x) => `
+      <div class="card">
+        <div class="eyebrow">${label} · ${esc(x.airport)}</div>
+        <dl class="rows">
+          <dt>Gepland</dt><dd>${esc(t(x.scheduled))}${x.revised && t(x.revised) !== t(x.scheduled) ? ` → <b>${esc(t(x.revised))}</b>` : ''}</dd>
+          ${x.terminal ? `<dt>Terminal</dt><dd>${esc(x.terminal)}</dd>` : ''}
+          <dt>Gate</dt><dd>${x.gate ? `<b>${esc(x.gate)}</b>` : 'nog niet bekend'}</dd>
+          ${x.checkIn ? `<dt>Check-in</dt><dd>${esc(x.checkIn)}</dd>` : ''}
+          ${x.baggage ? `<dt>Bagageband</dt><dd>${esc(x.baggage)}</dd>` : ''}
+        </dl>
+      </div>`;
+    set('live-status', `Status: <b>${esc(f.status || 'onbekend')}</b>`);
+    set('live-out', leg('Vertrek', f.dep) + leg('Aankomst', f.arr));
+  } catch (e) {
+    set('live-status', `Live gegevens niet beschikbaar (${esc(e.message || 'geen verbinding')}). Gebruik een van deze pagina’s:`);
+  }
 }
 
 let lastReel = null;
@@ -743,7 +877,7 @@ async function shareReel() {
 }
 
 function onOverlayClick(e) {
-  const t = e.target.closest('[data-close],[data-caption],[data-delphoto],[data-share-reel],[data-card]');
+  const t = e.target.closest('[data-close],[data-caption],[data-delphoto],[data-share-reel],[data-card],[data-hist]');
   if (e.target.id === 'overlay') { closeOverlay(); return; }
   if (!t) return;
   if (t.dataset.close !== undefined) closeOverlay();
@@ -755,6 +889,7 @@ function onOverlayClick(e) {
     if (confirm('Deze foto verwijderen? Ook op de andere telefoon.')) { NOTES.remove(t.dataset.delphoto); closeOverlay(); }
   } else if (t.dataset.shareReel !== undefined) shareReel();
   else if (t.dataset.card) makeDayReel(t.dataset.card, true);
+  else if (t.dataset.hist) showHistory(t.dataset.hist, t.dataset.histday === '1');
 }
 
 function wire() {
@@ -764,10 +899,31 @@ function wire() {
   setInterval(() => { if (!document.hidden) NOTES.syncNow(); }, 120000);
 
   $('#view').addEventListener('click', (e) => {
-    const t = e.target.closest('[data-refresh],[data-photo],[data-src],#make-reel,[data-zoom],[data-more],[data-read],[data-fav],[data-copy],[data-me],[data-who],[data-edit],[data-del],#near,#favs,#share-loc,#note-cancel');
+    const t = e.target.closest('[data-live-news],[data-live-history],[data-flight],[data-refresh],[data-select],[data-select-all],[data-select-done],[data-del-selected],[data-photo],[data-src],#make-reel,[data-zoom],[data-more],[data-read],[data-fav],[data-copy],[data-me],[data-who],[data-edit],[data-del],#near,#favs,#share-loc,#note-cancel');
     if (!t) return;
-    if (t.dataset.refresh !== undefined) hardRefresh();
-    else if (t.dataset.photo) openPhoto(t.dataset.photo);
+    if (t.dataset.liveNews) showNews(t.dataset.liveNews);
+    else if (t.dataset.liveHistory) showHistory(t.dataset.liveHistory);
+    else if (t.dataset.flight) showFlight(t.dataset.flight, t.dataset.date);
+    else if (t.dataset.refresh !== undefined) hardRefresh();
+    else if (t.dataset.photo && selecting.date && t.closest('.selecting')) {
+      const id = t.dataset.photo;
+      selecting.ids.has(id) ? selecting.ids.delete(id) : selecting.ids.add(id);
+      refreshDayNotes();
+    } else if (t.dataset.select) { selecting.date = t.dataset.select; selecting.ids.clear(); refreshDayNotes(); }
+    else if (t.dataset.selectAll) {
+      allPhotos().filter((n) => n.date === t.dataset.selectAll).forEach((n) => selecting.ids.add(n.id));
+      refreshDayNotes();
+    } else if (t.dataset.selectDone !== undefined) { selecting.date = null; selecting.ids.clear(); refreshDayNotes(); }
+    else if (t.dataset.delSelected) {
+      const n = selecting.ids.size;
+      if (n && confirm(`${n} ${n === 1 ? 'foto' : 'foto’s'} verwijderen? Ook op de andere telefoon.`)) {
+        [...selecting.ids].forEach((id) => NOTES.remove(id));
+        selecting.date = null;
+        selecting.ids.clear();
+        refreshDayNotes();
+        toast(`${n} ${n === 1 ? 'foto' : 'foto’s'} verwijderd`);
+      }
+    } else if (t.dataset.photo) openPhoto(t.dataset.photo);
     else if (t.dataset.src) {
       reading.mode = 'source';
       reading.query = t.dataset.src;
@@ -861,9 +1017,9 @@ function showLock(box, msg = '') {
 // iPhone home-screen apps are often resumed rather than restarted, so check for
 // a new version whenever the app comes to the foreground and reload into it,
 // unless a note is being typed.
-const APP_VERSION = '2026-10-17.4';
+const APP_VERSION = '2026-10-17.5';
 
-const APP_FILES = ['./', 'index.html', 'styles.css', 'app.js', 'crypto.js', 'places.js', 'notes.js', 'media.js', 'reel.js', 'manifest.webmanifest', 'data/trip.enc.json'];
+const APP_FILES = ['./', 'index.html', 'styles.css', 'app.js', 'crypto.js', 'places.js', 'notes.js', 'media.js', 'reel.js', 'live.js', 'manifest.webmanifest', 'data/trip.enc.json'];
 
 // Safety net next to the service worker: ask the server which version is live
 // (bypassing every cache) and offer a hard refresh when this copy is older.

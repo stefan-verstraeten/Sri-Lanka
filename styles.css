@@ -272,3 +272,22 @@ a.chip { text-decoration: none; }
   display: flex; align-items: center; justify-content: space-between; gap: 10px; box-shadow: var(--shadow);
 }
 .update-bar .btn { background: #fff; color: var(--ink); border: 0; }
+
+.photo-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: -4px 0 12px; }
+.photo-grid.selecting .pthumb { position: relative; }
+.photo-grid.selecting .pthumb::after {
+  content: ""; position: absolute; top: 6px; right: 6px; width: 22px; height: 22px; border-radius: 50%;
+  border: 2px solid #fff; background: rgb(0 0 0 / .25); box-shadow: 0 0 0 1px rgb(0 0 0 / .2);
+}
+.photo-grid.selecting .pthumb.picked::after { content: "✓"; color: #fff; background: var(--brand); font-size: 14px; line-height: 18px; text-align: center; }
+.photo-grid.selecting .pthumb.picked img { opacity: .75; }
+.btn.danger { color: var(--danger); }
+.btn[disabled] { opacity: .45; }
+
+/* Live info */
+.flight-live { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0 4px; }
+.news-item { display: block; padding: 10px 0; border-bottom: 1px solid var(--line); color: var(--ink); text-decoration: none; }
+.news-item b { display: block; font-weight: 600; font-size: 15px; }
+.news-item small { color: var(--muted); }
+.hist-item { display: grid; grid-template-columns: 52px 1fr; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 15px; }
+.hist-item b { color: var(--accent); }
