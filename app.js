@@ -6,6 +6,19 @@ import { canRecord, makeReel, makeCard } from './reel.js';
 import { placeName, localNews, onThisDay, flightStatus, flightLinks } from './live.js';
 
 const $ = (sel, el = document) => el.querySelector(sel);
+
+// Icons in the app color (white on a colored button). The nil manel, Sri Lanka's
+// blue water lily, marks every action; the rest keep a meaning of their own.
+const ICONS = {
+  manel: '<g fill="currentColor"><path transform="rotate(-62 12 16)" d="M12 3.2C14.1 6.6 14.3 10.9 12 15.6 9.7 10.9 9.9 6.6 12 3.2z"/><path transform="rotate(-31 12 16)" d="M12 3.2C14.1 6.6 14.3 10.9 12 15.6 9.7 10.9 9.9 6.6 12 3.2z"/><path transform="rotate(0 12 16)" d="M12 3.2C14.1 6.6 14.3 10.9 12 15.6 9.7 10.9 9.9 6.6 12 3.2z"/><path transform="rotate(31 12 16)" d="M12 3.2C14.1 6.6 14.3 10.9 12 15.6 9.7 10.9 9.9 6.6 12 3.2z"/><path transform="rotate(62 12 16)" d="M12 3.2C14.1 6.6 14.3 10.9 12 15.6 9.7 10.9 9.9 6.6 12 3.2z"/><path d="M3 17.6c3 2.6 15 2.6 18 0-1.2 3.4-16.8 3.4-18 0z"/></g>',
+  pin: '<path fill="currentColor" d="M12 2a7 7 0 0 0-7 7c0 5.2 7 13 7 13s7-7.8 7-13a7 7 0 0 0-7-7zm0 9.6a2.6 2.6 0 1 1 0-5.2 2.6 2.6 0 0 1 0 5.2z"/>',
+  phone: '<path fill="currentColor" d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 0 1 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1z"/>',
+  mail: '<g fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="5.5" width="18" height="13" rx="1.5"/><path d="m3.6 6.4 8.4 6.4 8.4-6.4"/></g>',
+  lock: '<rect fill="currentColor" x="5" y="10.5" width="14" height="10.5" rx="2"/><path fill="none" stroke="currentColor" stroke-width="2.2" d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/>',
+  unlock: '<rect fill="currentColor" x="5" y="10.5" width="14" height="10.5" rx="2"/><path fill="none" stroke="currentColor" stroke-width="2.2" d="M8 10.5V7.5a4 4 0 0 1 7.7-1.5"/>',
+  plane: '<path fill="currentColor" d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"/>',
+};
+const ic = (name) => `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name]}</svg>`;
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
 // localStorage can throw (private mode) or be wiped; the app must work without it.
@@ -232,10 +245,10 @@ function noteMeta(n) {
     bits.splice(1, 0, esc(fmt(d, { weekday: 'short', day: 'numeric', month: 'short' })));
   }
   const where = n.place ? (n.lat != null ? `<a href="${mapsAt(n.lat, n.lon, n.place)}">${esc(n.place)}</a>` : esc(n.place)) : '';
-  return `${bits.join(' · ')}${where ? ` · 📍 ${where}` : ''}${n.private ? ' · 🔒 privé, niet in de reel' : ''}`;
+  return `${bits.join(' · ')}${where ? ` · ${ic('pin')} ${where}` : ''}${n.private ? ` · ${ic('lock')} privé, niet in de reel` : ''}`;
 }
 
-const privateBtn = (n) => `<button class="btn small" data-private="${esc(n.id)}">${n.private ? '🔓 Privé uit' : '🔒 Privé'}</button>`;
+const privateBtn = (n) => `<button class="btn small" data-private="${esc(n.id)}">${n.private ? `${ic('unlock')} Privé uit` : `${ic('lock')} Privé`}</button>`;
 
 function noteCard(n, { actions = true } = {}) {
   const mine = n.author === store.get('me');
@@ -309,11 +322,11 @@ function viewDag(iso) {
   const flights = (day.flights || []).map((f) => `
     <div class="flight">
       <div><b>${esc(f.dep)}</b><small>${esc(f.from)}</small></div>
-      <div class="dur">✈︎ ${esc(f.no || '')}<br>${esc(f.dur)}</div>
+      <div class="dur">${ic('plane')} ${esc(f.no || '')}<br>${esc(f.dur)}</div>
       <div class="end"><b>${esc(f.arr)}</b><small>${esc(f.to)}</small></div>
     </div>
     ${f.no ? `<div class="flight-live">
-      <button class="btn small primary" data-flight="${esc(f.no)}" data-date="${day.iso}">🛫 Live: gate &amp; status</button>
+      <button class="btn small primary" data-flight="${esc(f.no)}" data-date="${day.iso}">${ic('manel')} Live: gate &amp; status</button>
       ${f.noUnconfirmed ? '<span class="note">Vluchtnummer nog niet bevestigd: controleer op je e-ticket.</span>' : ''}
     </div>` : ''}`).join('');
 
@@ -338,7 +351,7 @@ function viewDag(iso) {
     </section>` : '';
 
   const reads = (day.places || []).map(placeById).filter(Boolean)
-    .map((p) => `<button class="chip" data-read="${esc(p.name)}">📖 ${esc(p.name)}</button>`).join(' ');
+    .map((p) => `<button class="chip" data-read="${esc(p.name)}">${ic('manel')} ${esc(p.name)}</button>`).join(' ');
 
   return `
     <article class="day-page">
@@ -353,8 +366,8 @@ function viewDag(iso) {
       <section class="block">
         <div class="eyebrow">Ter plaatse</div>
         <div class="btn-row">
-          <button class="btn" data-live-news="${day.iso}">📰 Lokaal nieuws</button>
-          <button class="btn" data-live-history="${day.iso}">📜 Op deze dag</button>
+          <button class="btn" data-live-news="${day.iso}">${ic('manel')} Lokaal nieuws</button>
+          <button class="btn" data-live-history="${day.iso}">${ic('manel')} Op deze dag</button>
         </div>
       </section>
       <section class="block notes-block">
@@ -362,8 +375,8 @@ function viewDag(iso) {
         <div id="day-notes">${dayNotesHtml(day.iso)}</div>
         ${me ? `
           <div class="btn-row">
-            <label class="btn">📷 Foto’s toevoegen<input type="file" id="photo-input" data-date="${day.iso}" accept="image/*" multiple hidden></label>
-            <button class="btn" id="make-reel" data-date="${day.iso}">🎬 Dagreel</button>
+            <label class="btn">${ic('manel')} Foto’s toevoegen<input type="file" id="photo-input" data-date="${day.iso}" accept="image/*" multiple hidden></label>
+            <button class="btn" id="make-reel" data-date="${day.iso}">${ic('manel')} Dagreel</button>
           </div>` : ''}
         ${me ? `
           <form id="note-form" data-date="${day.iso}">
@@ -438,9 +451,9 @@ function viewNood() {
         ${c.address ? `<p><a href="${mapsQuery(c.address)}">${esc(c.address)}</a></p>` : ''}
         ${c.note ? `<p class="note">${esc(c.note)}</p>` : ''}
         <div class="btn-row">
-          ${c.phone ? `<a class="btn call" href="${telHref(c.phone)}">📞 ${esc(c.phone)}</a>` : ''}
-          ${c.phoneAlt ? `<a class="btn call alt" href="${telHref(c.phoneAlt)}">📞 ${esc(c.phoneAlt)}${c.phoneAltLabel ? ` · ${esc(c.phoneAltLabel)}` : ''}</a>` : ''}
-          ${c.email ? `<a class="btn small" href="mailto:${esc(c.email)}">✉︎ ${esc(c.email)}</a>` : ''}
+          ${c.phone ? `<a class="btn call" href="${telHref(c.phone)}">${ic('phone')} ${esc(c.phone)}</a>` : ''}
+          ${c.phoneAlt ? `<a class="btn call alt" href="${telHref(c.phoneAlt)}">${ic('phone')} ${esc(c.phoneAlt)}${c.phoneAltLabel ? ` · ${esc(c.phoneAltLabel)}` : ''}</a>` : ''}
+          ${c.email ? `<a class="btn small" href="mailto:${esc(c.email)}">${ic('mail')} ${esc(c.email)}</a>` : ''}
         </div>
       </div>`).join('')}`).join('');
   return `
@@ -449,7 +462,7 @@ function viewNood() {
       <a href="tel:1990"><b>1990</b><small>Ambulance</small></a>
       <a href="tel:1912"><b>1912</b><small>Toeristen</small></a>
     </div>
-    <div class="btn-row"><button class="btn" id="share-loc" style="width:100%">📍 Deel mijn locatie</button></div>
+    <div class="btn-row"><button class="btn" id="share-loc" style="width:100%">${ic('pin')} Deel mijn locatie</button></div>
     ${groups}`;
 }
 
@@ -574,9 +587,9 @@ function viewLezen() {
   return `
     <form class="search" id="search-form">
       <input id="q" type="search" placeholder="Plaats of trefwoord" value="${esc(reading.mode === 'search' ? reading.query : '')}" enterkeyhint="search" autocapitalize="none" autocorrect="off">
-      <button type="button" class="btn primary" id="near">📍 In de buurt</button>
+      <button type="button" class="btn primary" id="near">${ic('pin')} In de buurt</button>
     </form>
-    <div class="filters"><a class="chip on" href="#/bronnen">📚 Bronnen</a>${route}<button class="chip" id="favs">★ Favorieten</button></div>
+    <div class="filters"><a class="chip on" href="#/bronnen">${ic('manel')} Bronnen</a>${route}<button class="chip" id="favs"><span class="glyph">★</span> Favorieten</button></div>
     ${body}`;
 }
 
@@ -774,7 +787,7 @@ function newsLinks(place) {
 }
 
 async function showNews(iso) {
-  overlay(`<h3>📰 Lokaal nieuws</h3><p class="note" id="live-status">Locatie bepalen…</p><div id="live-out"></div>
+  overlay(`<h3>${ic('manel')} Lokaal nieuws</h3><p class="note" id="live-status">Locatie bepalen…</p><div id="live-out"></div>
     <div class="btn-row"><button class="btn small" data-close>Sluiten</button></div>`);
   const set = (id, html) => { const el = document.getElementById(id); if (el) el.innerHTML = html; };
   let where = { town: dayPlace(iso), district: '' };
@@ -808,7 +821,7 @@ async function showHistory(iso, useDayDate = false) {
   const tripDate = parseDate(iso);
   const date = useDayDate ? tripDate : new Date();
   const other = isoOf(tripDate) !== todayIso();
-  overlay(`<h3>📜 Op ${esc(fmtShort(date))}</h3>
+  overlay(`<h3>${ic('manel')} Op ${esc(fmtShort(date))}</h3>
     ${other ? `<div class="filters"><button class="chip${useDayDate ? '' : ' on'}" data-hist="${iso}" data-histday="0">Vandaag</button><button class="chip${useDayDate ? ' on' : ''}" data-hist="${iso}" data-histday="1">Deze reisdag (${esc(fmtShort(tripDate))})</button></div>` : ''}
     <p class="note" id="live-status">Wikipedia raadplegen…</p><div id="live-out"></div>
     <div class="btn-row"><button class="btn small" data-close>Sluiten</button></div>`);
@@ -832,7 +845,7 @@ async function showHistory(iso, useDayDate = false) {
 async function showFlight(no, iso) {
   const key = DATA.flightApiKey;
   const links = flightLinks(no).map(([n, u]) => `<a class="btn small" href="${esc(u)}" target="_blank" rel="noopener">${esc(n)}</a>`).join('');
-  overlay(`<h3>🛫 ${esc(no)} · ${esc(fmtShort(parseDate(iso)))}</h3>
+  overlay(`<h3>${ic('manel')} ${esc(no)} · ${esc(fmtShort(parseDate(iso)))}</h3>
     <p class="note" id="live-status">${key ? 'Live gegevens ophalen…' : 'Gate, terminal en vertraging staan live op deze pagina’s:'}</p>
     <div id="live-out"></div>
     <div class="btn-row">${links}</div>
@@ -1073,7 +1086,7 @@ function showLock(box, msg = '') {
 // iPhone home-screen apps are often resumed rather than restarted, so check for
 // a new version whenever the app comes to the foreground and reload into it,
 // unless a note is being typed.
-const APP_VERSION = '2026-10-17.8';
+const APP_VERSION = '2026-10-17.9';
 
 const APP_FILES = ['./', 'index.html', 'styles.css', 'app.js', 'crypto.js', 'places.js', 'notes.js', 'media.js', 'reel.js', 'live.js', 'manifest.webmanifest', 'data/trip.enc.json'];
 

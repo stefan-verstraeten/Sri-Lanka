@@ -158,7 +158,7 @@ main { padding: 12px 16px calc(var(--tabs-h) + env(safe-area-inset-bottom) + 20p
 .passage cite { display: block; margin-top: 10px; font-style: normal; font-size: 13px; color: var(--muted); }
 .passage .foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 10px; }
 .passage .tags { display: flex; flex-wrap: wrap; gap: 6px; }
-.star { border: 0; background: none; font-size: 22px; color: var(--accent); padding: 4px; }
+.star { border: 0; background: none; font-size: 22px; color: var(--brand); padding: 4px; }
 .empty { text-align: center; padding: 30px 12px; color: var(--muted); }
 .empty h3 { color: var(--ink); margin-bottom: 6px; }
 
@@ -300,7 +300,10 @@ a.chip { text-decoration: none; }
 .hist-item b { color: var(--accent); }
 .note-card.private { border-style: dashed; opacity: .85; }
 .pthumb.private { position: relative; }
-.pthumb.private::before { content: "🔒"; position: absolute; left: 4px; bottom: 4px; font-size: 13px; line-height: 1; filter: drop-shadow(0 0 2px #fff); }
+.pthumb.private::before {
+  content: ""; position: absolute; left: 5px; bottom: 5px; width: 20px; height: 20px; border-radius: 50%;
+  background: #aa0924 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect fill='%23fff' x='5' y='10.5' width='14' height='10.5' rx='2'/%3E%3Cpath fill='none' stroke='%23fff' stroke-width='2.2' d='M8 10.5V7.5a4 4 0 0 1 8 0v3'/%3E%3C/svg%3E") center / 12px no-repeat;
+}
 
 /* Clocks */
 .clocks { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 14px 0; }
@@ -319,3 +322,10 @@ a.chip { text-decoration: none; }
 .clock figcaption b { font-size: 15px; }
 .clock-time { font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .block .clocks { margin: 0; }
+
+/* Icons: app color, white on colored backgrounds */
+.ic { width: 1.15em; height: 1.15em; vertical-align: -0.2em; color: var(--brand); flex: none; }
+.glyph { color: var(--brand); }
+.btn.primary .ic, .btn.call .ic, .chip.on .ic, .chip.on .glyph, .top .ic { color: var(--brand-ink); }
+.note-meta .ic { width: 1.05em; height: 1.05em; }
+.flight .dur .ic { width: 16px; height: 16px; display: block; margin: 0 auto 2px; }
