@@ -301,3 +301,21 @@ a.chip { text-decoration: none; }
 .note-card.private { border-style: dashed; opacity: .85; }
 .pthumb.private { position: relative; }
 .pthumb.private::before { content: "🔒"; position: absolute; left: 4px; bottom: 4px; font-size: 13px; line-height: 1; filter: drop-shadow(0 0 2px #fff); }
+
+/* Clocks */
+.clocks { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 14px 0; }
+.clock { margin: 0; display: grid; justify-items: center; gap: 6px; padding: 12px 8px 10px; background: var(--card); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); }
+.clock svg { width: min(112px, 100%); height: auto; }
+.clock .face { fill: var(--bg); stroke: var(--brand); stroke-width: 3; }
+.clock.night .face { fill: var(--today); }
+.clock .tick { stroke: var(--muted); stroke-width: 1.5; stroke-linecap: round; }
+.clock .tick.major { stroke: var(--ink); stroke-width: 2.6; }
+.clock .hand { stroke: var(--ink); stroke-linecap: round; }
+.clock .hand.h { stroke-width: 4.5; }
+.clock .hand.m { stroke-width: 3; }
+.clock .hand.s { stroke: var(--brand); stroke-width: 1.4; }
+.clock .pin { fill: var(--brand); }
+.clock figcaption { display: grid; justify-items: center; line-height: 1.25; }
+.clock figcaption b { font-size: 15px; }
+.clock-time { font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.block .clocks { margin: 0; }

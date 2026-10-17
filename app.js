@@ -161,11 +161,52 @@ function viewStart() {
         <h3>${esc(day.title)}</h3>
         <p class="note">${esc(fmt(day.d, { weekday: 'long', day: 'numeric', month: 'long' }))}${day.stay ? ` · ${esc(day.stay.name)}` : ''}</p>
       </a>
+      ${clocksHtml()}
       <nav class="tiles">
         ${tiles.map(([href, t, s]) => `<a class="tile" href="${href}"><b>${t}</b><small>${esc(s)}</small></a>`).join('')}
       </nav>
       <p class="foot-note">${me ? `Je bent <b>${esc(me)}</b> · <button class="link" data-me="">wijzig</button><br>` : ''}${esc(st.text)}<br>Versie ${APP_VERSION} · <button class="link" data-refresh>App vernieuwen</button></p>
     </section>`;
+}
+
+// Two analog clocks: local time in Sri Lanka and at home in Belgium.
+const CLOCKS = [['Asia/Colombo', 'Sri Lanka'], ['Europe/Brussels', 'België']];
+
+function clocksHtml() {
+  const ticks = Array.from({ length: 12 }, (_, i) => `<line class="tick${i % 3 ? '' : ' major'}" x1="50" y1="${i % 3 ? 8 : 6}" x2="50" y2="13" transform="rotate(${i * 30} 50 50)"/>`).join('');
+  return `<div class="clocks">${CLOCKS.map(([tz, label]) => `
+    <figure class="clock" data-tz="${tz}">
+      <svg viewBox="0 0 100 100" aria-hidden="true">
+        <circle class="face" cx="50" cy="50" r="46"/>${ticks}
+        <line class="hand h" x1="50" y1="54" x2="50" y2="28"/>
+        <line class="hand m" x1="50" y1="56" x2="50" y2="16"/>
+        <line class="hand s" x1="50" y1="58" x2="50" y2="12"/>
+        <circle class="pin" cx="50" cy="50" r="2.6"/>
+      </svg>
+      <figcaption><b>${label}</b><span class="clock-time"></span></figcaption>
+    </figure>`).join('')}</div>`;
+}
+
+function zoned(tz, now = new Date()) {
+  const p = Object.fromEntries(new Intl.DateTimeFormat('nl-BE', { timeZone: tz, hourCycle: 'h23', hour: 'numeric', minute: 'numeric', second: 'numeric', weekday: 'short' })
+    .formatToParts(now).map((x) => [x.type, x.value]));
+  return { h: +p.hour, m: +p.minute, s: +p.second, wd: p.weekday };
+}
+
+function tickClocks() {
+  const els = document.querySelectorAll('.clock');
+  if (!els.length) return;
+  const now = new Date();
+  const days = new Set();
+  const all = [...els].map((el) => { const t = zoned(el.dataset.tz, now); days.add(t.wd); return [el, t]; });
+  for (const [el, t] of all) {
+    const rot = (sel, deg) => el.querySelector(sel).setAttribute('transform', `rotate(${deg} 50 50)`);
+    rot('.h', (t.h % 12) * 30 + t.m / 2);
+    rot('.m', t.m * 6 + t.s / 10);
+    rot('.s', t.s * 6);
+    el.classList.toggle('night', t.h < 6 || t.h >= 19);
+    el.querySelector('.clock-time').textContent = `${days.size > 1 ? `${t.wd} ` : ''}${t.h}:${String(t.m).padStart(2, '0')}`;
+  }
 }
 
 function viewReis() {
@@ -308,6 +349,7 @@ function viewDag(iso) {
       </header>
       ${flights}${items}${stay}
       ${reads ? `<section class="block"><div class="eyebrow">Lezen over</div><div class="btn-row">${reads}</div></section>` : ''}
+      <section class="block">${clocksHtml()}</section>
       <section class="block">
         <div class="eyebrow">Ter plaatse</div>
         <div class="btn-row">
@@ -571,6 +613,7 @@ function render({ keepScroll = false } = {}) {
   document.querySelectorAll('#tabs a').forEach((a) => a.setAttribute('aria-current', a.dataset.tab === r.tab ? 'page' : 'false'));
   hydrateImages($('#view'));
   hydratePhotos($('#view'));
+  tickClocks();
   if (keepScroll) window.scrollTo(0, y);
 }
 
@@ -908,6 +951,7 @@ function wire() {
   document.addEventListener('visibilitychange', () => { if (!document.hidden) NOTES.syncNow(); });
   window.addEventListener('online', () => NOTES.syncNow());
   setInterval(() => { if (!document.hidden) NOTES.syncNow(); }, 120000);
+  setInterval(() => { if (!document.hidden) tickClocks(); }, 1000);
 
   $('#view').addEventListener('click', (e) => {
     const t = e.target.closest('[data-live-news],[data-live-history],[data-flight],[data-refresh],[data-select],[data-select-all],[data-select-done],[data-del-selected],[data-photo],[data-src],#make-reel,[data-zoom],[data-more],[data-read],[data-fav],[data-copy],[data-me],[data-who],[data-edit],[data-private],[data-del],#near,#favs,#share-loc,#note-cancel');
@@ -1029,7 +1073,7 @@ function showLock(box, msg = '') {
 // iPhone home-screen apps are often resumed rather than restarted, so check for
 // a new version whenever the app comes to the foreground and reload into it,
 // unless a note is being typed.
-const APP_VERSION = '2026-10-17.7';
+const APP_VERSION = '2026-10-17.8';
 
 const APP_FILES = ['./', 'index.html', 'styles.css', 'app.js', 'crypto.js', 'places.js', 'notes.js', 'media.js', 'reel.js', 'live.js', 'manifest.webmanifest', 'data/trip.enc.json'];
 
