@@ -1,8 +1,9 @@
-// Offline support. App files: served from cache, refreshed in the background.
+// Offline support. App files: network first (so updates arrive at once),
+// falling back to the cache after a short wait or when offline.
 // Trip data: network first so updates arrive, cache when offline.
 // Photos: cached once, kept forever.
 
-const CACHE = 'sri-lanka-v3';
+const CACHE = 'sri-lanka-v4';
 const PHOTOS = 'sri-lanka-photos';
 const SHELL = [
   './',
@@ -61,11 +62,13 @@ self.addEventListener('fetch', (e) => {
   }
 
   const key = e.request.mode === 'navigate' ? new Request('./') : e.request;
-  e.respondWith(
-    caches.match(key, { ignoreSearch: true }).then((hit) => {
-      const update = fresh(key).catch(() => hit);
-      if (hit) { e.waitUntil(update); return hit; }
-      return update;
-    }),
-  );
+  e.respondWith((async () => {
+    const hit = await caches.match(key, { ignoreSearch: true });
+    const net = fresh(key);
+    if (!hit) return net;
+    // Slow or no network: use the cached copy, the download still refreshes the cache.
+    const timeout = new Promise((resolve) => setTimeout(() => resolve(hit), 2500));
+    e.waitUntil(net.catch(() => {}));
+    return Promise.race([net.catch(() => hit), timeout]);
+  })());
 });

@@ -161,7 +161,7 @@ function viewStart() {
       <nav class="tiles">
         ${tiles.map(([href, t, s]) => `<a class="tile" href="${href}"><b>${t}</b><small>${esc(s)}</small></a>`).join('')}
       </nav>
-      <p class="foot-note">${me ? `Je bent <b>${esc(me)}</b> · <button class="link" data-me="">wijzig</button><br>` : ''}${esc(st.text)}</p>
+      <p class="foot-note">${me ? `Je bent <b>${esc(me)}</b> · <button class="link" data-me="">wijzig</button><br>` : ''}${esc(st.text)}<br>Versie ${APP_VERSION}</p>
     </section>`;
 }
 
@@ -635,8 +635,31 @@ function showLock(box, msg = '') {
   };
 }
 
+// iPhone home-screen apps are often resumed rather than restarted, so check for
+// a new version whenever the app comes to the foreground and reload into it,
+// unless a note is being typed.
+const APP_VERSION = '2026-10-17.2';
+
+function watchForUpdates() {
+  if (!('serviceWorker' in navigator)) return;
+  let reloading = false;
+  const hadController = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.register('sw.js').then((reg) => {
+    const check = () => reg.update().catch(() => {});
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) check(); });
+    setInterval(check, 30 * 60 * 1000);
+  }).catch(() => {});
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController || reloading) return;
+    const typing = document.querySelector('#note-text')?.value.trim();
+    if (typing) { toast('Nieuwe versie klaar: herstart de app na het bewaren.'); return; }
+    reloading = true;
+    location.reload();
+  });
+}
+
 async function start() {
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+  watchForUpdates();
   let box;
   try {
     box = await loadBox();

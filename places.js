@@ -28,7 +28,7 @@ export const PLACES = [
   { id: 'adams-peak', name: "Adam's Peak", lat: 6.8096, lon: 80.4994, aliases: ['sri pada', 'adamspiek', 'adams peak'] },
   { id: 'nuwara-eliya', name: 'Nuwara Eliya', lat: 6.9497, lon: 80.7891, aliases: ['little england', 'nanu oya', 'kandapola', 'gregory lake', 'hakgala', 'moon plains', 'talawakele', 'thalawakele', 'st clair'] },
   { id: 'horton-plains', name: 'Horton Plains', lat: 6.802, lon: 80.806, aliases: ["world's end", 'worlds end', 'pattipola', 'ohiya', 'ambewela'] },
-  { id: 'haputale', name: 'Haputale', lat: 6.7656, lon: 80.951, aliases: ["lipton's seat", 'liptons seat', 'dambatenne'] },
+  { id: 'haputale', name: 'Haputale', lat: 6.7656, lon: 80.951, aliases: ["lipton's seat", 'liptons seat', 'dambatenne', 'adisham', 'diyatalawa'] },
   { id: 'bambarakanda', name: 'Bambarakanda', lat: 6.7737, lon: 80.8303, aliases: ['kalupahana'] },
   { id: 'bandarawela', name: 'Bandarawela', lat: 6.829, lon: 80.987 },
   { id: 'ella', name: 'Ella', lat: 6.8667, lon: 81.0466, aliases: ['nine arch bridge', 'little adams peak'] },
