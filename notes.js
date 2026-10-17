@@ -1,9 +1,11 @@
-// Travel notes. Every note is kept on the phone first; when the trip data holds a
-// GitHub token (sync), notes are also stored encrypted as notes/<id>.json on a
-// separate branch, so both phones see each other's notes. Without a token, or
-// offline, the app keeps working and syncs later.
+// Travel notes and photos. Everything is kept on the phone first; when the trip
+// data holds a GitHub token (sync), each entry is also stored encrypted as
+// notes/<id>.json on a separate branch (a photo's image as photos/<id>.bin), so
+// both phones see each other's notes. Without a token, or offline, the app keeps
+// working and syncs later.
 
-import { encryptText, decryptText } from './crypto.js';
+import { encryptText, decryptText, encryptBytes, decryptBytes, toB64 } from './crypto.js';
+import { media } from './media.js';
 
 const API = 'https://api.github.com';
 
@@ -11,6 +13,7 @@ export function createNotes({ key, sync, store, onChange }) {
   const notes = store.get('notes:v1', {});
   const shas = store.get('notes:sha', {});
   const queue = new Set(store.get('notes:queue', []));
+  const uploaded = new Set(store.get('notes:uploaded', []));
   let busy = null;
   let branchReady = false;
   let lastError = '';
@@ -22,6 +25,7 @@ export function createNotes({ key, sync, store, onChange }) {
     store.set('notes:v1', notes);
     store.set('notes:sha', shas);
     store.set('notes:queue', [...queue]);
+    store.set('notes:uploaded', [...uploaded]);
   }
 
   function list() {
@@ -43,6 +47,7 @@ export function createNotes({ key, sync, store, onChange }) {
   function remove(id) {
     if (!notes[id]) return;
     notes[id] = { ...notes[id], deleted: true, updated: new Date().toISOString() };
+    if (notes[id].type === 'photo') media.del(id).catch(() => {});
     queue.add(id);
     persist();
     onChange();
@@ -55,13 +60,14 @@ export function createNotes({ key, sync, store, onChange }) {
       cache: 'no-store',
       headers: {
         Authorization: `Bearer ${sync.token}`,
-        Accept: 'application/vnd.github+json',
+        Accept: opts.raw ? 'application/vnd.github.raw' : 'application/vnd.github+json',
         'X-GitHub-Api-Version': '2022-11-28',
         ...(opts.body ? { 'Content-Type': 'application/json' } : {}),
       },
     });
     if (res.status === 404) return null;
     if (!res.ok) throw new Error(res.status === 401 ? 'De sleutel voor het delen van notities is verlopen of ongeldig.' : `GitHub antwoordde ${res.status}`);
+    if (opts.raw) return new Uint8Array(await res.arrayBuffer());
     return res.status === 204 ? {} : res.json();
   }
 
@@ -75,15 +81,37 @@ export function createNotes({ key, sync, store, onChange }) {
     branchReady = true;
   }
 
+  async function putFile(path, b64, message) {
+    const cur = await gh(`${path}?ref=${sync.branch}`);
+    return gh(path, { method: 'PUT', body: JSON.stringify({ message, content: b64, branch: sync.branch, ...(cur ? { sha: cur.sha } : {}) }) });
+  }
+
+  async function delFile(path, message) {
+    const cur = await gh(`${path}?ref=${sync.branch}`);
+    if (cur) await gh(path, { method: 'DELETE', body: JSON.stringify({ message, sha: cur.sha, branch: sync.branch }) });
+  }
+
   async function push(id) {
     const n = notes[id];
     const path = `/contents/notes/${id}.json`;
-    const cur = await gh(`${path}?ref=${sync.branch}`);
     if (!n || n.deleted) {
-      if (cur) await gh(path, { method: 'DELETE', body: JSON.stringify({ message: 'Notitie verwijderd', sha: cur.sha, branch: sync.branch }) });
+      await delFile(path, 'Notitie verwijderd');
+      if (n?.type === 'photo') await delFile(`/contents/photos/${id}.bin`, 'Foto verwijderd');
       delete notes[id];
       delete shas[id];
+      uploaded.delete(id);
+      media.del(id).catch(() => {});
     } else {
+      // A photo's image goes up first, so the other phone never sees a photo it cannot load.
+      if (n.type === 'photo' && !uploaded.has(id)) {
+        const blob = await media.get(id);
+        if (blob) {
+          const bytes = await encryptBytes(key, new Uint8Array(await blob.arrayBuffer()));
+          await putFile(`/contents/photos/${id}.bin`, toB64(bytes), 'Foto');
+          uploaded.add(id);
+        }
+      }
+      const cur = await gh(`${path}?ref=${sync.branch}`);
       const file = JSON.stringify({ v: 1, data: await encryptText(key, JSON.stringify(n)) });
       const res = await gh(path, {
         method: 'PUT',
@@ -108,11 +136,26 @@ export function createNotes({ key, sync, store, onChange }) {
     // A synced note that disappeared remotely was deleted on the other phone.
     for (const id of Object.keys(notes)) {
       if (!remote.has(id) && !queue.has(id) && shas[id]) {
+        if (notes[id].type === 'photo') media.del(id).catch(() => {});
         delete notes[id];
         delete shas[id];
       }
     }
     persist();
+  }
+
+  // The image of a photo: from this phone, or downloaded once from the other phone's upload.
+  async function photo(id) {
+    const local = await media.get(id).catch(() => null);
+    if (local) return local;
+    if (!enabled || !navigator.onLine) return null;
+    const enc = await gh(`/contents/photos/${id}.bin?ref=${sync.branch}`, { raw: true });
+    if (!enc) return null;
+    const blob = new Blob([await decryptBytes(key, enc)], { type: 'image/jpeg' });
+    await media.put(id, blob).catch(() => {});
+    uploaded.add(id);
+    persist();
+    return blob;
   }
 
   function syncNow() {
@@ -140,11 +183,11 @@ export function createNotes({ key, sync, store, onChange }) {
   }
 
   function status() {
-    if (!enabled) return { kind: 'local', text: 'Notities staan alleen op deze telefoon (delen is nog niet ingesteld).' };
+    if (!enabled) return { kind: 'local', text: 'Notities en foto’s staan alleen op deze telefoon (delen is nog niet ingesteld).' };
     if (lastError) return { kind: 'error', text: `Niet gesynchroniseerd: ${lastError}` };
-    if (queue.size) return { kind: 'pending', text: `${queue.size} ${queue.size === 1 ? 'notitie wacht' : 'notities wachten'} op internet om te delen.` };
+    if (queue.size) return { kind: 'pending', text: `${queue.size} ${queue.size === 1 ? 'item wacht' : 'items wachten'} op internet om te delen.` };
     return { kind: 'ok', text: 'Gedeeld en bijgewerkt.' };
   }
 
-  return { list, save, remove, syncNow, status };
+  return { list, save, remove, syncNow, status, photo };
 }

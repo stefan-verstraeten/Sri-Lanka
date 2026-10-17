@@ -1,6 +1,8 @@
 import { decryptJSON, importContentKey, decryptBytes } from './crypto.js';
 import { placeById, findPlaces, nearestPlaces, fold } from './places.js';
 import { createNotes } from './notes.js';
+import { media, preparePhoto } from './media.js';
+import { canRecord, makeReel, makeCard } from './reel.js';
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -133,7 +135,7 @@ function viewStart() {
   const isToday = day.iso === todayIso();
   const tiles = [
     ['#/reis', 'Reisplan', 'Alle 16 dagen'],
-    ['#/notities', 'Notities', `${NOTES.list().length} ${NOTES.list().length === 1 ? 'notitie' : 'notities'}`],
+    ['#/notities', 'Notities', `${textNotes().length} ${textNotes().length === 1 ? 'notitie' : 'notities'} · ${allPhotos().length} foto’s`],
     ['#/lezen', 'Lezen', 'Teksten per plaats'],
     ['#/boekingen', 'Boekingen', 'Vluchten, hotels, verzekering'],
     ['#/nood', 'Nood', 'Hulpdiensten en ambassade'],
@@ -201,9 +203,34 @@ function noteCard(n, { actions = true } = {}) {
     </article>`;
 }
 
+const textNotes = () => NOTES.list().filter((n) => n.type !== 'photo');
+const allPhotos = () => NOTES.list().filter((n) => n.type === 'photo');
+
+function photoGrid(list) {
+  if (!list.length) return '';
+  return `<div class="photo-grid">${list.map((ph) => `<button class="pthumb" data-photo="${esc(ph.id)}" aria-label="Foto"><img data-ph="${esc(ph.id)}" alt=""></button>`).join('')}</div>`;
+}
+
 function dayNotesHtml(iso) {
-  const list = NOTES.list().filter((n) => n.date === iso);
-  return list.length ? list.map((n) => noteCard(n)).join('') : '<p class="note">Nog geen notities voor deze dag.</p>';
+  const photos = allPhotos().filter((n) => n.date === iso);
+  const notes = textNotes().filter((n) => n.date === iso);
+  if (!photos.length && !notes.length) return '<p class="note">Nog geen foto’s of notities voor deze dag.</p>';
+  return photoGrid(photos) + notes.map((n) => noteCard(n)).join('');
+}
+
+// Photo thumbnails come from the phone (or once from the other phone's upload).
+const photoUrls = new Map();
+function photoUrl(id) {
+  if (!photoUrls.has(id)) {
+    photoUrls.set(id, NOTES.photo(id).then((b) => (b ? URL.createObjectURL(b) : null)).catch(() => null));
+  }
+  return photoUrls.get(id).then((u) => { if (!u) photoUrls.delete(id); return u; });
+}
+function hydratePhotos(root = document) {
+  root.querySelectorAll('img[data-ph]:not([src])').forEach(async (el) => {
+    const url = await photoUrl(el.dataset.ph);
+    if (url) el.src = url; else el.closest('.pthumb')?.classList.add('missing');
+  });
 }
 
 function viewDag(iso) {
@@ -257,8 +284,13 @@ function viewDag(iso) {
       ${flights}${items}${stay}
       ${reads ? `<section class="block"><div class="eyebrow">Lezen over</div><div class="btn-row">${reads}</div></section>` : ''}
       <section class="block notes-block">
-        <h3>Notities</h3>
+        <h3>Foto’s & notities</h3>
         <div id="day-notes">${dayNotesHtml(day.iso)}</div>
+        ${me ? `
+          <div class="btn-row">
+            <label class="btn">📷 Foto’s toevoegen<input type="file" id="photo-input" data-date="${day.iso}" accept="image/*" multiple hidden></label>
+            <button class="btn" id="make-reel" data-date="${day.iso}">🎬 Dagreel</button>
+          </div>` : ''}
         ${me ? `
           <form id="note-form" data-date="${day.iso}">
             <textarea id="note-text" rows="4" placeholder="Wat wil je onthouden van vandaag?">${editing ? esc(editing.text) : ''}</textarea>
@@ -292,6 +324,7 @@ let mapZoom = 2.5;
 function viewNotities() {
   const people = DATA.trip.people || [];
   const all = NOTES.list().filter((n) => noteFilter.who === 'all' || n.author === noteFilter.who);
+  const isPhoto = (n) => n.type === 'photo';
   const days = tripDays();
   const groups = days.map((day) => ({ day, notes: all.filter((n) => n.date === day.iso) })).filter((g) => g.notes.length);
   const st = NOTES.status();
@@ -303,8 +336,9 @@ function viewNotities() {
     <p class="status sync-${st.kind}">${esc(st.text)}</p>
     ${groups.length ? groups.map(({ day, notes }) => `
       <h2 class="section-title"><a href="#/dag/${day.iso}">Dag ${day.n} · ${esc(fmt(day.d, { weekday: 'short', day: 'numeric', month: 'short' }))} · ${esc(day.title)}</a></h2>
-      ${notes.map((n) => noteCard(n, { actions: false })).join('')}`).join('')
-    : '<div class="empty"><h3>Nog geen notities</h3><p>Open een dag in het reisplan en schrijf onderaan je eerste notitie.</p></div>'}`;
+      ${photoGrid(notes.filter(isPhoto))}
+      ${notes.filter((n) => !isPhoto(n)).map((n) => noteCard(n, { actions: false })).join('')}`).join('')
+    : '<div class="empty"><h3>Nog geen notities</h3><p>Open een dag in het reisplan en schrijf onderaan je eerste notitie of voeg foto’s toe.</p></div>'}`;
 }
 
 function viewBoekingen() {
@@ -394,8 +428,42 @@ function passageCard(p, f) {
     </article>`;
 }
 
+const KINDS = [['literatuur', 'Literatuur'], ['poëzie', 'Poëzie'], ['cultuur', 'Cultuur & geschiedenis']];
+const sourceKind = (src) => (DATA.sources || []).find((x) => x.source === src && x.kind !== 'poëzie')?.kind || 'cultuur';
+const kindOf = (p) => ((p.tags || []).includes('poëzie') ? 'poëzie' : sourceKind(p.source));
+
+// Passages in the order you meet their places on the trip.
+function routeOrder(list) {
+  const order = new Map();
+  (DATA.days || []).forEach((d, i) => (d.places || []).forEach((id) => { if (!order.has(id)) order.set(id, i); }));
+  const rank = (p) => Math.min(99, ...(p.places || []).map((id) => order.get(id) ?? 99));
+  return [...list].sort((a, b) => rank(a) - rank(b));
+}
+
+function viewBronnen() {
+  const groups = KINDS.map(([kind, label]) => {
+    const cards = (DATA.sources || []).filter((x) => x.kind === kind).map((x) => {
+      const n = passages().filter((p) => p.source === x.source && kindOf(p) === kind).length;
+      if (!n) return '';
+      return `
+        <button class="card source" data-src="${esc(x.source)}" data-kind="${kind}">
+          <h3>${esc(x.title || x.source)}</h3>
+          <div class="role">${esc(x.author)}${x.year ? ` · ${esc(x.year)}` : ''}</div>
+          <p>${esc(x.about)}</p>
+          <p class="note">${n} ${n === 1 ? 'fragment' : 'fragmenten'} · ${esc(x.rights)}</p>
+        </button>`;
+    }).join('');
+    return cards ? `<h2 class="section-title">${label}</h2>${cards}` : '';
+  }).join('');
+  return `<p class="note" style="margin:4px 4px 0">Alle bronnen achter de teksten in Lezen. Tik op een bron om de fragmenten te lezen, in de volgorde van de reis.</p>${groups}`;
+}
+
 function readingResults() {
   const f = favs();
+  if (reading.mode === 'source') {
+    const list = routeOrder(passages().filter((p) => p.source === reading.query && kindOf(p) === reading.kind));
+    return { title: `${reading.query} · ${list.length} ${list.length === 1 ? 'fragment' : 'fragmenten'}`, list };
+  }
   if (reading.mode === 'fav') return { title: `Favorieten (${f.size})`, list: passages().filter((p) => f.has(p.id)) };
   if (reading.mode === 'near' && reading.near) {
     const ids = reading.near.map((p) => p.id);
@@ -434,7 +502,7 @@ function viewLezen() {
       <input id="q" type="search" placeholder="Plaats of trefwoord" value="${esc(reading.mode === 'search' ? reading.query : '')}" enterkeyhint="search" autocapitalize="none" autocorrect="off">
       <button type="button" class="btn primary" id="near">📍 In de buurt</button>
     </form>
-    <div class="filters">${route}<button class="chip" id="favs">★ Favorieten</button></div>
+    <div class="filters"><a class="chip on" href="#/bronnen">📚 Bronnen</a>${route}<button class="chip" id="favs">★ Favorieten</button></div>
     ${body}`;
 }
 
@@ -449,6 +517,7 @@ const ROUTES = {
   boekingen: { tab: 'start', title: 'Boekingen', view: viewBoekingen, back: '#/' },
   nood: { tab: 'nood', title: 'Nood', view: viewNood },
   kaart: { tab: 'start', title: 'Ceylon, 1692', view: viewKaart, back: '#/' },
+  bronnen: { tab: 'lezen', title: 'Bronnen', view: viewBronnen, back: '#/lezen' },
 };
 
 function currentRoute() {
@@ -469,11 +538,13 @@ function render({ keepScroll = false } = {}) {
   $('#view').innerHTML = r.view(arg);
   document.querySelectorAll('#tabs a').forEach((a) => a.setAttribute('aria-current', a.dataset.tab === r.tab ? 'page' : 'false'));
   hydrateImages($('#view'));
+  hydratePhotos($('#view'));
   if (keepScroll) window.scrollTo(0, y);
 }
 
 function onRoute() {
   editingNote = null;
+  closeOverlay();
   render();
   if (['notities', 'dag', ''].includes(currentRoute().name)) NOTES.syncNow();
   window.scrollTo(0, 0);
@@ -486,7 +557,7 @@ function onNotesChange() {
   const { name } = currentRoute();
   if (name === 'dag') {
     const box = $('#day-notes');
-    if (box) box.innerHTML = dayNotesHtml(currentRoute().arg);
+    if (box) { box.innerHTML = dayNotesHtml(currentRoute().arg); hydratePhotos(box); }
   } else if (name === 'notities' || name === '') {
     render({ keepScroll: true });
   }
@@ -547,6 +618,145 @@ async function saveNote(form) {
   } catch { /* keep the day's place */ }
 }
 
+/* ---------- photos & day reel ---------- */
+
+const newId = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+const dayPlace = (iso) => {
+  const day = (DATA.days || []).find((d) => d.date === iso);
+  return placeById(day?.places?.[0])?.name || day?.stay?.area || '';
+};
+
+async function addPhotos(input) {
+  const files = [...input.files];
+  const date = input.dataset.date;
+  input.value = '';
+  if (!files.length) return;
+  toast(`${files.length} ${files.length === 1 ? 'foto' : 'foto’s'} bewaren…`);
+  const saved = [];
+  for (const file of files) {
+    try {
+      const { blob, w, h } = await preparePhoto(file);
+      const id = newId();
+      await media.put(id, blob);
+      saved.push(NOTES.save({ id, type: 'photo', date, author: store.get('me'), caption: '', place: dayPlace(date), w, h }));
+    } catch {
+      toast('Een foto kon niet gelezen worden.');
+    }
+  }
+  if (saved.length) toast(`${saved.length} ${saved.length === 1 ? 'foto' : 'foto’s'} bewaard`);
+  try {
+    const c = await getPosition(8000);
+    const near = nearestPlaces(c.latitude, c.longitude, 1)[0];
+    const place = near && near.km < 25 ? `bij ${near.name}` : `${c.latitude.toFixed(3)}, ${c.longitude.toFixed(3)}`;
+    for (const ph of saved) NOTES.save({ ...ph, place, lat: +c.latitude.toFixed(5), lon: +c.longitude.toFixed(5) });
+  } catch { /* keep the day's place */ }
+}
+
+function overlay(html) {
+  closeOverlay();
+  const el = document.createElement('div');
+  el.className = 'overlay';
+  el.id = 'overlay';
+  el.innerHTML = `<div class="sheet">${html}</div>`;
+  document.body.append(el);
+  el.addEventListener('click', onOverlayClick);
+  return el;
+}
+function closeOverlay() { $('#overlay')?.remove(); }
+
+async function openPhoto(id) {
+  const ph = NOTES.list().find((n) => n.id === id);
+  if (!ph) return;
+  const mine = ph.author === store.get('me');
+  overlay(`
+    <img class="big-photo" alt="" id="big-photo">
+    ${ph.caption ? `<p class="caption">${esc(ph.caption)}</p>` : ''}
+    <div class="note-meta">${noteMeta(ph)}</div>
+    <div class="btn-row">
+      ${mine ? `<button class="btn small" data-caption="${esc(id)}">Bijschrift</button><button class="btn small" data-delphoto="${esc(id)}">Verwijder</button>` : ''}
+      <button class="btn small primary" data-close>Sluiten</button>
+    </div>`);
+  const url = await photoUrl(id);
+  if (url && $('#big-photo')) $('#big-photo').src = url;
+}
+
+let lastReel = null;
+
+async function makeDayReel(iso, asCard = false) {
+  const day = tripDays().find((d) => d.iso === iso);
+  const entries = NOTES.list().filter((n) => n.date === iso).sort((a, b) => a.created.localeCompare(b.created));
+  if (!entries.length) { toast('Voeg eerst foto’s of notities toe aan deze dag.'); return; }
+  const recording = !asCard && canRecord();
+  overlay(`
+    <h3>${recording ? 'Dagreel maken' : 'Dagkaart maken'}</h3>
+    <p class="note">${recording ? 'De film wordt op je telefoon opgenomen en duurt even lang als de reel zelf. Houd het scherm open.' : asCard ? 'Eén afbeelding met de dag, tot vier foto’s en een notitie.' : 'Je telefoon kan hier geen film opnemen, dus je krijgt één afbeelding met de foto’s en een notitie.'}</p>
+    <div class="progress"><div id="reel-bar"></div></div>
+    <div id="reel-out"></div>
+    <div class="btn-row"><button class="btn small" data-close>Annuleer</button></div>`);
+  let lock = null;
+  try { lock = await navigator.wakeLock?.request('screen'); } catch { /* not supported */ }
+  try {
+    const items = [];
+    for (const n of entries) {
+      if (n.type === 'photo') {
+        const blob = await NOTES.photo(n.id);
+        if (blob) items.push({ ...n, blob });
+      } else items.push({ ...n, type: 'note' });
+    }
+    const people = (DATA.trip.people || []).join(' & ');
+    const opts = {
+      eyebrow: `Dag ${day.n} · ${fmt(day.d, { weekday: 'long', day: 'numeric', month: 'long' })}`,
+      title: day.title,
+      sub: day.stay?.area || (day.places || []).map((id) => placeById(id)?.name).filter(Boolean).join(', '),
+      signature: people ? `${people} · Sri Lanka 2026` : 'Sri Lanka 2026',
+      items,
+    };
+    const bar = (p) => { const b = $('#reel-bar'); if (b) b.style.width = `${Math.round(p * 100)}%`; };
+    const out = recording ? await makeReel(opts, bar) : (bar(1), await makeCard(opts));
+    if (!$('#overlay')) return;
+    const name = `Sri-Lanka-dag-${day.n}.${out.ext}`;
+    lastReel = new File([out.blob], name, { type: out.blob.type });
+    const url = URL.createObjectURL(out.blob);
+    $('#reel-out').innerHTML = `
+      ${out.ext === 'jpg' ? `<img class="big-photo" src="${url}" alt="">` : `<video class="big-photo" src="${url}" controls playsinline loop></video>`}
+      <div class="btn-row">
+        <button class="btn primary" data-share-reel>Delen (WhatsApp…)</button>
+        <a class="btn" href="${url}" download="${name}">Bewaar</a>
+        ${recording ? `<button class="btn" data-card="${iso}">Liever één foto</button>` : ''}
+      </div>`;
+  } catch (e) {
+    if ($('#reel-out')) $('#reel-out').innerHTML = `<p class="sync-error">Het maken lukte niet: ${esc(e.message || e)}</p>`;
+  } finally {
+    lock?.release?.().catch(() => {});
+  }
+}
+
+async function shareReel() {
+  if (!lastReel) return;
+  const data = { files: [lastReel], title: lastReel.name };
+  try {
+    if (navigator.canShare?.(data)) await navigator.share(data);
+    else toast('Delen gaat hier niet; tik op Bewaar en deel het bestand daarna.');
+  } catch (e) {
+    if (e.name !== 'AbortError') toast('Delen lukte niet.');
+  }
+}
+
+function onOverlayClick(e) {
+  const t = e.target.closest('[data-close],[data-caption],[data-delphoto],[data-share-reel],[data-card]');
+  if (e.target.id === 'overlay') { closeOverlay(); return; }
+  if (!t) return;
+  if (t.dataset.close !== undefined) closeOverlay();
+  else if (t.dataset.caption) {
+    const ph = NOTES.list().find((n) => n.id === t.dataset.caption);
+    const c = prompt('Bijschrift bij deze foto:', ph?.caption || '');
+    if (ph && c !== null) { NOTES.save({ ...ph, caption: c.trim() }); openPhoto(ph.id); }
+  } else if (t.dataset.delphoto) {
+    if (confirm('Deze foto verwijderen? Ook op de andere telefoon.')) { NOTES.remove(t.dataset.delphoto); closeOverlay(); }
+  } else if (t.dataset.shareReel !== undefined) shareReel();
+  else if (t.dataset.card) makeDayReel(t.dataset.card, true);
+}
+
 function wire() {
   window.addEventListener('hashchange', onRoute);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) NOTES.syncNow(); });
@@ -554,9 +764,17 @@ function wire() {
   setInterval(() => { if (!document.hidden) NOTES.syncNow(); }, 120000);
 
   $('#view').addEventListener('click', (e) => {
-    const t = e.target.closest('[data-zoom],[data-more],[data-read],[data-fav],[data-copy],[data-me],[data-who],[data-edit],[data-del],#near,#favs,#share-loc,#note-cancel');
+    const t = e.target.closest('[data-photo],[data-src],#make-reel,[data-zoom],[data-more],[data-read],[data-fav],[data-copy],[data-me],[data-who],[data-edit],[data-del],#near,#favs,#share-loc,#note-cancel');
     if (!t) return;
-    if (t.dataset.zoom) {
+    if (t.dataset.photo) openPhoto(t.dataset.photo);
+    else if (t.dataset.src) {
+      reading.mode = 'source';
+      reading.query = t.dataset.src;
+      reading.kind = t.dataset.kind;
+      reading.message = '';
+      location.hash = '#/lezen';
+    } else if (t.id === 'make-reel') makeDayReel(t.dataset.date);
+    else if (t.dataset.zoom) {
       mapZoom = Math.min(5, Math.max(1, mapZoom + Number(t.dataset.zoom) * 0.75));
       $('#bigmap').style.width = `${mapZoom * 100}%`;
     } else if (t.dataset.more !== undefined) {
@@ -583,6 +801,10 @@ function wire() {
     else if (t.id === 'near') nearMe();
     else if (t.id === 'favs') { reading.mode = 'fav'; reading.message = ''; render({ keepScroll: true }); }
     else if (t.id === 'share-loc') shareLocation();
+  });
+
+  $('#view').addEventListener('change', (e) => {
+    if (e.target.id === 'photo-input') addPhotos(e.target);
   });
 
   $('#view').addEventListener('submit', (e) => {
@@ -638,7 +860,7 @@ function showLock(box, msg = '') {
 // iPhone home-screen apps are often resumed rather than restarted, so check for
 // a new version whenever the app comes to the foreground and reload into it,
 // unless a note is being typed.
-const APP_VERSION = '2026-10-17.2';
+const APP_VERSION = '2026-10-17.3';
 
 function watchForUpdates() {
   if (!('serviceWorker' in navigator)) return;

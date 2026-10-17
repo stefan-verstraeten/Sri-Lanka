@@ -4,7 +4,7 @@
 const te = new TextEncoder();
 const td = new TextDecoder();
 
-function toB64(bytes) {
+export function toB64(bytes) {
   let s = '';
   for (let i = 0; i < bytes.length; i += 0x8000) {
     s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
@@ -12,7 +12,7 @@ function toB64(bytes) {
   return btoa(s);
 }
 
-function fromB64(s) {
+export function fromB64(s) {
   return Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
 }
 

@@ -15,6 +15,14 @@ All trip details live in `data/trip.enc.json`, encrypted with a passphrase
 random content key stored inside the trip data. The plaintext `private/` folder
 is git-ignored and never committed.
 
+## Photos and day reels
+
+Photos added on a day page are scaled to 1600 px and kept in IndexedDB on the
+phone (`media.js`). With sharing set up they are uploaded encrypted as
+`photos/<id>.bin` next to the notes. `reel.js` turns a day's photos and notes into
+a portrait video (canvas + MediaRecorder, recorded in real time) or, as a
+fallback, a single image, which can be shared to WhatsApp via the share sheet.
+
 ## Shared notes
 
 Notes are saved on each phone. When the trip data contains a `sync` entry
