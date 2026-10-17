@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#0f4c45">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Sri Lanka">
+  <title>Sri Lanka</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="styles.css">
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <div id="app">
+    <section id="lock" class="lock" hidden>
+      <div class="lock-card">
+        <img src="icons/icon-192.png" alt="" class="lock-icon">
+        <h1>Sri Lanka</h1>
+        <form id="lock-form" autocomplete="off">
+          <label for="pass" class="sr-only">Wachtwoord</label>
+          <input id="pass" type="password" placeholder="Wachtwoord" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="go" required>
+          <button type="submit" class="btn primary">Openen</button>
+        </form>
+        <p id="lock-msg" class="lock-msg" role="alert"></p>
+      </div>
+    </section>
+
+    <header id="top" class="top" hidden>
+      <div>
+        <h1 id="top-title">Sri Lanka</h1>
+        <p id="top-sub" class="top-sub"></p>
+      </div>
+    </header>
+
+    <main id="view" hidden></main>
+
+    <nav id="tabs" class="tabs" hidden>
+      <button data-tab="reis"><svg viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h10"/></svg><span>Reis</span></button>
+      <button data-tab="boekingen"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M8 6V4h8v2"/></svg><span>Boekingen</span></button>
+      <button data-tab="nood"><svg viewBox="0 0 24 24"><path d="M12 3l9 16H3z"/><path d="M12 10v4M12 17v.01"/></svg><span>Nood</span></button>
+      <button data-tab="lezen"><svg viewBox="0 0 24 24"><path d="M3 5c3-1 6-1 9 1 3-2 6-2 9-1v14c-3-1-6-1-9 1-3-2-6-2-9-1z"/><path d="M12 6v14"/></svg><span>Lezen</span></button>
+    </nav>
+  </div>
+</body>
+</html>
