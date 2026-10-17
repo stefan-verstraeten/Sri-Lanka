@@ -265,3 +265,10 @@ label.btn { cursor: pointer; }
 a.chip { text-decoration: none; }
 .card.source { display: block; width: 100%; text-align: left; font: inherit; color: inherit; }
 .card.source p { margin: 6px 0 0; font-size: 15px; }
+
+.update-bar {
+  position: fixed; left: 12px; right: 12px; top: calc(env(safe-area-inset-top) + 10px); z-index: 30;
+  background: var(--accent); color: #fff; border-radius: 14px; padding: 10px 14px; font-size: 15px;
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; box-shadow: var(--shadow);
+}
+.update-bar .btn { background: #fff; color: var(--ink); border: 0; }

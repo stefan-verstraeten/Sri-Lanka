@@ -163,7 +163,7 @@ function viewStart() {
       <nav class="tiles">
         ${tiles.map(([href, t, s]) => `<a class="tile" href="${href}"><b>${t}</b><small>${esc(s)}</small></a>`).join('')}
       </nav>
-      <p class="foot-note">${me ? `Je bent <b>${esc(me)}</b> · <button class="link" data-me="">wijzig</button><br>` : ''}${esc(st.text)}<br>Versie ${APP_VERSION}</p>
+      <p class="foot-note">${me ? `Je bent <b>${esc(me)}</b> · <button class="link" data-me="">wijzig</button><br>` : ''}${esc(st.text)}<br>Versie ${APP_VERSION} · <button class="link" data-refresh>App vernieuwen</button></p>
     </section>`;
 }
 
@@ -764,9 +764,10 @@ function wire() {
   setInterval(() => { if (!document.hidden) NOTES.syncNow(); }, 120000);
 
   $('#view').addEventListener('click', (e) => {
-    const t = e.target.closest('[data-photo],[data-src],#make-reel,[data-zoom],[data-more],[data-read],[data-fav],[data-copy],[data-me],[data-who],[data-edit],[data-del],#near,#favs,#share-loc,#note-cancel');
+    const t = e.target.closest('[data-refresh],[data-photo],[data-src],#make-reel,[data-zoom],[data-more],[data-read],[data-fav],[data-copy],[data-me],[data-who],[data-edit],[data-del],#near,#favs,#share-loc,#note-cancel');
     if (!t) return;
-    if (t.dataset.photo) openPhoto(t.dataset.photo);
+    if (t.dataset.refresh !== undefined) hardRefresh();
+    else if (t.dataset.photo) openPhoto(t.dataset.photo);
     else if (t.dataset.src) {
       reading.mode = 'source';
       reading.query = t.dataset.src;
@@ -860,7 +861,37 @@ function showLock(box, msg = '') {
 // iPhone home-screen apps are often resumed rather than restarted, so check for
 // a new version whenever the app comes to the foreground and reload into it,
 // unless a note is being typed.
-const APP_VERSION = '2026-10-17.3';
+const APP_VERSION = '2026-10-17.4';
+
+const APP_FILES = ['./', 'index.html', 'styles.css', 'app.js', 'crypto.js', 'places.js', 'notes.js', 'media.js', 'reel.js', 'manifest.webmanifest', 'data/trip.enc.json'];
+
+// Safety net next to the service worker: ask the server which version is live
+// (bypassing every cache) and offer a hard refresh when this copy is older.
+async function checkVersion() {
+  try {
+    const res = await fetch(`version.json?t=${Date.now()}`, { cache: 'no-store' });
+    const { version } = await res.json();
+    if (version && version !== APP_VERSION && !document.getElementById('update-bar')) {
+      const bar = document.createElement('div');
+      bar.id = 'update-bar';
+      bar.className = 'update-bar';
+      bar.innerHTML = `Nieuwe versie beschikbaar (${version}). <button class="btn small">Bijwerken</button>`;
+      bar.querySelector('button').onclick = hardRefresh;
+      document.body.append(bar);
+    }
+  } catch { /* offline */ }
+}
+
+// Drops the service worker and the cached app files (not the photos or notes) and reloads.
+async function hardRefresh() {
+  try {
+    for (const reg of await navigator.serviceWorker?.getRegistrations?.() || []) await reg.unregister();
+    for (const k of await caches.keys()) if (k !== 'sri-lanka-photos') await caches.delete(k);
+    // The browser's own HTTP cache may still hold old copies; overwrite them.
+    await Promise.all(APP_FILES.map((f) => fetch(f, { cache: 'reload' }).catch(() => {})));
+  } catch { /* reload anyway */ }
+  location.replace(`./?v=${Date.now()}${location.hash}`);
+}
 
 function watchForUpdates() {
   if (!('serviceWorker' in navigator)) return;
@@ -868,7 +899,7 @@ function watchForUpdates() {
   const hadController = !!navigator.serviceWorker.controller;
   navigator.serviceWorker.register('sw.js').then((reg) => {
     const check = () => reg.update().catch(() => {});
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) check(); });
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) { check(); checkVersion(); } });
     setInterval(check, 30 * 60 * 1000);
   }).catch(() => {});
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -882,6 +913,7 @@ function watchForUpdates() {
 
 async function start() {
   watchForUpdates();
+  checkVersion();
   let box;
   try {
     box = await loadBox();

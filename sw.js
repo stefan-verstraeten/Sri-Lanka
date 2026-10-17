@@ -3,7 +3,7 @@
 // Trip data: network first so updates arrive, cache when offline.
 // Photos: cached once, kept forever.
 
-const CACHE = 'sri-lanka-v5';
+const CACHE = 'sri-lanka-v6';
 const PHOTOS = 'sri-lanka-photos';
 const SHELL = [
   './',
@@ -45,6 +45,7 @@ async function fresh(req) {
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET' || url.origin !== location.origin) return;
+  if (url.pathname.endsWith('/version.json')) return; // always straight from the network
 
   if (url.pathname.endsWith('/data/trip.enc.json')) {
     e.respondWith(fresh(e.request).catch(() => caches.match(e.request, { ignoreSearch: true })));
