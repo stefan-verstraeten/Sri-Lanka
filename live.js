@@ -79,6 +79,8 @@ export async function onThisDay(month, day) {
         year: e.year,
         text: e.text,
         url: page?.content_urls?.mobile?.page,
+        page: page?.titles?.normalized || page?.title?.replace(/_/g, ' ') || '',
+        extract: page?.extract || '',
         sl: SL.test(e.text) || (e.pages || []).some((p) => SL.test(`${p.title} ${p.description || ''}`)),
       });
     }

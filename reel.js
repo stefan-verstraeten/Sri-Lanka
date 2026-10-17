@@ -138,7 +138,7 @@ function drawNote(ctx, s, p) {
 }
 
 function drawEnd(ctx, s) {
-  ctx.fillStyle = '#0f4c45';
+  ctx.fillStyle = '#aa0924';
   ctx.fillRect(0, 0, W, H);
   ctx.fillStyle = '#fff';
   ctx.textAlign = 'center';
@@ -280,7 +280,7 @@ export async function makeCard(opts) {
     ctx.fillText(`— ${meta(note.item)}`, 40, ny + nt.size + nt.lines.length * nt.size * 1.4 + 14);
   }
   ctx.font = `600 24px ${SERIF}`;
-  ctx.fillStyle = '#0f4c45';
+  ctx.fillStyle = '#aa0924';
   ctx.textAlign = 'right';
   ctx.fillText(opts.signature, W - 40, H - 40);
   list.forEach((s) => s.url && URL.revokeObjectURL(s.url));

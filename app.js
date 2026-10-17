@@ -772,14 +772,15 @@ async function showHistory(iso, useDayDate = false) {
   const set = (id, html) => { const el = document.getElementById(id); if (el) el.innerHTML = html; };
   try {
     const r = await onThisDay(date.getMonth() + 1, date.getDate());
-    const row = (x) => `<div class="hist-item"><b>${x.year ?? ''}</b><span>${esc(x.text)}${x.url ? ` <a href="${esc(x.url)}" target="_blank" rel="noopener">›</a>` : ''}</span></div>`;
-    if (r.sl.length) {
-      set('live-status', `Sri Lanka op ${esc(fmtShort(date))}`);
-      set('live-out', r.sl.map(row).join(''));
-    } else {
-      set('live-status', `Wikipedia’s kalender vermeldt voor ${esc(fmtShort(date))} niets over Sri Lanka. Wel elders in de wereld:`);
-      set('live-out', r.world.slice(0, 8).map(row).join(''));
-    }
+    const row = (x) => `<div class="hist-item"><b>${x.year ?? ''}</b><div>
+      <p>${esc(x.text)}</p>
+      ${x.extract ? `<p class="hist-more">${x.page ? `<i>${esc(x.page)}</i> — ` : ''}${esc(x.extract)}</p>` : ''}
+      ${x.url ? `<a href="${esc(x.url)}" target="_blank" rel="noopener">Lees op Wikipedia ›</a>` : ''}
+    </div></div>`;
+    const world = r.world.slice(0, r.sl.length ? 6 : 10);
+    set('live-status', r.sl.length ? `Sri Lanka op ${esc(fmtShort(date))}` : `Wikipedia’s kalender vermeldt voor ${esc(fmtShort(date))} niets over Sri Lanka.`);
+    set('live-out', r.sl.map(row).join('')
+      + (world.length ? `<div class="eyebrow hist-head">Elders in de wereld</div>${world.map(row).join('')}` : ''));
   } catch (e) {
     set('live-status', `Wikipedia kon niet geladen worden (${esc(e.message || 'geen verbinding')}).`);
   }
@@ -1028,7 +1029,7 @@ function showLock(box, msg = '') {
 // iPhone home-screen apps are often resumed rather than restarted, so check for
 // a new version whenever the app comes to the foreground and reload into it,
 // unless a note is being typed.
-const APP_VERSION = '2026-10-17.6';
+const APP_VERSION = '2026-10-17.7';
 
 const APP_FILES = ['./', 'index.html', 'styles.css', 'app.js', 'crypto.js', 'places.js', 'notes.js', 'media.js', 'reel.js', 'live.js', 'manifest.webmanifest', 'data/trip.enc.json'];
 
