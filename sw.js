@@ -3,7 +3,7 @@
 // Trip data: network first so updates arrive, cache when offline.
 // Photos: cached once, kept forever.
 
-const CACHE = 'sri-lanka-v13';
+const CACHE = 'sri-lanka-v14';
 const PHOTOS = 'sri-lanka-photos';
 const SHELL = [
   './',
@@ -32,7 +32,7 @@ self.addEventListener('install', (e) => {
 self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE && k !== PHOTOS).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => k.startsWith('sri-lanka-') && k !== CACHE && k !== PHOTOS).map((k) => caches.delete(k))))
       .then(() => self.clients.claim()),
   );
 });

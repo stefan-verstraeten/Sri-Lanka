@@ -22,11 +22,23 @@ const ic = (name) => `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${I
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
 // localStorage can throw (private mode) or be wiped; the app must work without it.
+// Keys are prefixed: other trip apps may be served from the same origin and share it.
+const NS = 'sri-lanka:';
 const store = {
-  get(k, fallback = null) { try { const v = localStorage.getItem(k); return v === null ? fallback : JSON.parse(v); } catch { return fallback; } },
-  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* ignore */ } },
-  del(k) { try { localStorage.removeItem(k); } catch { /* ignore */ } },
+  get(k, fallback = null) { try { const v = localStorage.getItem(NS + k); return v === null ? fallback : JSON.parse(v); } catch { return fallback; } },
+  set(k, v) { try { localStorage.setItem(NS + k, JSON.stringify(v)); } catch { /* ignore */ } },
+  del(k) { try { localStorage.removeItem(NS + k); } catch { /* ignore */ } },
 };
+
+// Earlier versions stored these without the prefix: move them over once, so the
+// password, the chosen name, favourites and notes not yet shared are kept.
+try {
+  for (const k of ['pass', 'me', 'favs', 'notes:v1', 'notes:sha', 'notes:queue', 'notes:uploaded']) {
+    const v = localStorage.getItem(k);
+    if (v !== null && localStorage.getItem(NS + k) === null) localStorage.setItem(NS + k, v);
+    if (v !== null) localStorage.removeItem(k);
+  }
+} catch { /* no storage */ }
 
 let DATA = null;
 let KEY = null;
@@ -1086,7 +1098,7 @@ function showLock(box, msg = '') {
 // iPhone home-screen apps are often resumed rather than restarted, so check for
 // a new version whenever the app comes to the foreground and reload into it,
 // unless a note is being typed.
-const APP_VERSION = '2026-10-17.11';
+const APP_VERSION = '2026-10-17.12';
 
 const APP_FILES = ['./', 'index.html', 'styles.css', 'app.js', 'crypto.js', 'places.js', 'notes.js', 'media.js', 'reel.js', 'live.js', 'manifest.webmanifest', 'data/trip.enc.json'];
 
@@ -1110,8 +1122,9 @@ async function checkVersion() {
 // Drops the service worker and the cached app files (not the photos or notes) and reloads.
 async function hardRefresh() {
   try {
-    for (const reg of await navigator.serviceWorker?.getRegistrations?.() || []) await reg.unregister();
-    for (const k of await caches.keys()) if (k !== 'sri-lanka-photos') await caches.delete(k);
+    // Only this app's own worker and caches: other apps may share the origin.
+    await (await navigator.serviceWorker?.getRegistration?.())?.unregister();
+    for (const k of await caches.keys()) if (k.startsWith('sri-lanka-') && k !== 'sri-lanka-photos') await caches.delete(k);
     // The browser's own HTTP cache may still hold old copies; overwrite them.
     await Promise.all(APP_FILES.map((f) => fetch(f, { cache: 'reload' }).catch(() => {})));
   } catch { /* reload anyway */ }
